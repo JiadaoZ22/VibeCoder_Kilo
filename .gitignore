@@ -2,26 +2,6 @@
 # Nested project / separate Git worktree — keep local only, not tracked by this repo
 f1_JDgent/
 JDgentLAB/
-f1_Code/IMI/flowagent/
-f0_Database/
-# Ignore f0_Environment except SynthSeg_Torch (one level so Git traverses into un-ignored dir)
-f0_Environment/*
-fA_MideaPlat/
-f1_Code_copy/
-f1_Code/Brain/FreeSurfer_v2.0.0/.fs_recon_staging/
-f2_Output/
-fX_Report_copy/
-fZ_Reference/WD_天坛医院/41593_2025_2144_MOESM4_ESM/
-# Output dirs anywhere (e.g. WebAPP_MR-Agent/v2.2.x/Output); * matches one segment, ** matches dirs
-**/Output/
-# x_shared_step9bcd_LanguageAI (and similar packs): sample inputs + pipeline outputs at any depth
-**/AAA_Input/
-**/AAA_RunThis_Output/
-# WebAPP v2.3.0 vendored BrainChart: normative GAMLSS + DPS trees (large; keep local / use download scripts)
-f1_Code/Brain/WebAPP_MR-Agent/v2.3.0/CHN_BrainChart_byTianTanHospital/Models*
-# WebAPP v2.3.0: Ollama blobs + optional portable binary (populate via Ollama/setup_ollama.sh)
-f1_Code/Brain/WebAPP_MR-Agent/v2.3.0/Ollama/models/
-f1_Code/Brain/WebAPP_MR-Agent/v2.3.0/Ollama/bin/
 
 # models and weights
 *.h5
@@ -231,11 +211,6 @@ cython_debug/
 test
 logs/
 run_sys/
-*.json
-!f1_AgentPlatform/NonContrastChestCT_8yuan_v1.0.0/AAA_RunThis/tests/Config_FailureCases_PUBLIC_1OF3.json
-!f1_AgentPlatform/NonContrastChestCT_8yuan_v1.0.0/AAA_RunThis/tests/Config_FailureCases_CHN_PUBLIC_1OF3.json
-!fZ_Reference/1_VibeCoding/KiloCode/auth.json
-!fZ_Reference/1_VibeCoding/KiloCode/opencode.json
 *.pt
 .archive/
 .fuse_hidden*

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "model": "ark/ark-code-latest",
+  "provider": {
+    "ark": {
+      "name": "Volcano Ark (Coding Plan)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "apiKey": "",
+        "baseURL": "https://ark.cn-beijing.volces.com/api/coding/v3"
+      },
+      "models": {
+        "ark-code-latest": {
+          "name": "Ark(VolcanoEngine) Auto: effect+speed"
+        },
+        "doubao-seed-2.0-code": {
+          "name": "Doubao Seed 2.0 Code"
+        },
+        "doubao-seed-2.0-pro": {
+          "name": "Doubao Seed 2.0 Pro"
+        },
+        "doubao-seed-2.0-lite": {
+          "name": "Doubao Seed 2.0 Lite"
+        },
+        "doubao-seed-code": {
+          "name": "Doubao Seed Code"
+        },
+        "minimax-latest": {
+          "name": "MiniMax M2.7"
+        },
+        "glm-5.1": {
+          "name": "GLM 5.1"
+        },
+        "glm-4.7": {
+          "name": "GLM 4.7"
+        },
+        "deepseek-v3.2": {
+          "name": "DeepSeek V3.2"
+        },
+        "kimi-k2.6": {
+          "name": "Kimi K2.6"
+        },
+        "kimi-k2.5": {
+          "name": "Kimi K2.5"
+        }
+      }
+    }
+  },
+  "permission": {
+    "bash": "allow"
+  }
+}
