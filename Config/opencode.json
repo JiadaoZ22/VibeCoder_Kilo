@@ -46,6 +46,20 @@
       }
     }
   },
+  "mcpServers": {
+    "vector-search": {
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-vector-search",
+        "--provider", "openai",
+        "--api-key", "{env:ARK_API_KEY}",
+        "--base-url", "https://ark.cn-beijing.volces.com/api/coding/v3",
+        "--model", "doubao-embedding-vision-251215",
+        "--chunk-size", "1024",
+        "--chunk-overlap", "200"
+      ]
+    }
+  },
   "permission": {
     "bash": "allow"
   }
