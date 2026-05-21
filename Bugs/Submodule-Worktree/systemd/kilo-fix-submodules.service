@@ -1,0 +1,6 @@
+[Unit]
+Description=Repair Kilo submodule worktrees
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/kilo-fix-submodules.py

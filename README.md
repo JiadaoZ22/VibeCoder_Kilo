@@ -272,6 +272,14 @@ kilo session list
 
 **Root cause:** Kilo's TUI captures mouse events for its own UI interactions (scrolling, buttons, etc.), which intercepts your terminal emulator's native text selection. Additionally, on Linux there is a known bug ([#8326](https://github.com/Kilo-Org/kilocode/issues/8326)) where Kilo shows "Copied to clipboard" feedback without actually writing to the system clipboard (especially on Wayland).
 
+> **Fix:** If Kilo says "Copied to clipboard" but nothing is actually copied, you are likely missing the underlying clipboard utility. Install the one matching your display server, then restart Kilo:
+> ```bash
+> # X11
+> sudo apt install xclip    # or xsel
+> # Wayland
+> sudo apt install wl-clipboard
+> ```
+
 **Workarounds:**
 
 | Method | How |
