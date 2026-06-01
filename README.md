@@ -1,6 +1,6 @@
 # VibeCoder Kilo — Kilo Code CLI Configuration
 
-This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟)** provider and optional **vector-search MCP** for intelligent code retrieval.
+This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟 — 专属 API Key)** provider and optional **vector-search MCP** for intelligent code retrieval.
 
 ---
 
@@ -37,7 +37,7 @@ cp Config/auth.json    ~/.local/share/kilo/auth.json
 
 ### 3. Add Your Ark API Key
 
-Edit `~/.local/share/kilo/auth.json` and paste your key:
+**Option A — Edit `~/.local/share/kilo/auth.json` and paste your key:**
 
 ```json
 {
@@ -48,11 +48,21 @@ Edit `~/.local/share/kilo/auth.json` and paste your key:
 }
 ```
 
-Or export it as an environment variable:
+**Option B — Hard-code it directly in `~/.config/kilo/opencode.json`:**
+
+Find the `"apiKey"` field under `provider.ark.options` and replace `""` with your key:
+
+```json
+"apiKey": "your-ark-api-key-here"
+```
+
+**Option C — Export it as an environment variable:**
 
 ```bash
 export ARK_API_KEY="your-ark-api-key-here"
 ```
+
+> **Note:** If you use Option C, also change `"apiKey": ""` to `"apiKey": "{env:ARK_API_KEY}"` in `opencode.json` so Kilo picks it up.
 
 ### 4. Launch Kilo
 
@@ -119,11 +129,20 @@ After indexing, simply ask questions in natural language and Kilo will auto-retr
 
 All configured models are OpenAI-compatible endpoints served through Ark:
 
+**Language models**
+- `ark-code-latest` (Auto-routing)
 - `doubao-seed-2.0-code` / `pro` / `lite`
+- `doubao-seed-code`
 - `minimax-latest`
 - `glm-5.1`, `glm-4.7`
 - `deepseek-v3.2`
 - `kimi-k2.6`, `kimi-k2.5`
+
+**Vision models**
+- `doubao-seedance-2.0`
+- `doubao-seedance-2.0-fast`
+- `doubao-seedance-1.5-pro`
+- `doubao-seedream-5.0-lite`
 
 Switch models anytime inside Kilo with `/models`.
 
@@ -143,7 +162,7 @@ npm install -g @modelcontextprotocol/server-vector-search
 
 #### Enable
 
-The `mcpServers` block is already present in `opencode.json`. It will be active as soon as you copy the config and restart Kilo.
+The `mcp` block is already present in `opencode.json`. It will be active as soon as you copy the config and restart Kilo.
 
 #### Usage
 
@@ -177,7 +196,7 @@ Use **`/compact`** (or **`/summarize`**) regularly to condense conversation hist
 
 ### 2. Enable Vector-Search MCP (Codebase RAG)
 
-The `mcpServers` block in this repo's `Config/opencode.json` sets up **Retrieval-Augmented Generation (RAG)**. Instead of dumping entire files into the prompt, Kilo retrieves only the most relevant code snippets.
+The `mcp` block in this repo's `Config/opencode.json` sets up **Retrieval-Augmented Generation (RAG)**. Instead of dumping entire files into the prompt, Kilo retrieves only the most relevant code snippets.
 
 **To enable it now:**
 ```bash
@@ -308,13 +327,14 @@ kilo session list
 ### Configuration Tips
 
 - **Rotate keys without editing files**: replace `"apiKey": ""` with `"apiKey": "{env:ARK_API_KEY}"` in `opencode.json` and export the variable in your shell.
-- **Disable vector search**: simply remove the `mcpServers` block from `opencode.json` and restart Kilo.
-- **Chunk tuning**: if retrieval quality feels off, adjust `--chunk-size` and `--chunk-overlap` in the `mcpServers` configuration.
+- **API key location**: You have three choices for supplying the key — `~/.local/share/kilo/auth.json` (recommended), the `apiKey` field inside `~/.config/kilo/opencode.json`, or the `ARK_API_KEY` environment variable.
+- **Disable vector search**: simply remove the `mcp` block from `opencode.json` and restart Kilo.
+- **Chunk tuning**: if retrieval quality feels off, adjust `--chunk-size` and `--chunk-overlap` in the `mcp` configuration.
 
 ---
 
 ## References
 
 - [Kilo Code CLI Docs](https://kilo.ai/docs/code-with-ai/platforms/cli)
-- [Volcano Ark API Docs](https://www.volcengine.com/docs/82379/1928261?lang=zh)
+- [Ark API Docs](https://www.volcengine.com/docs/82379/1928261?lang=zh)
 - [MCP Vector Search Server](https://github.com/modelcontextprotocol/servers/tree/main/src/vector-search)

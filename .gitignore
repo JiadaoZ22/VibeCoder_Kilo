@@ -214,3 +214,7 @@ run_sys/
 *.pt
 .archive/
 .fuse_hidden*
+
+# Kilo auth file — never commit real API keys
+Config/auth.json
+

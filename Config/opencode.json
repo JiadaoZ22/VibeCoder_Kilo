@@ -3,11 +3,11 @@
   "model": "ark/ark-code-latest",
   "provider": {
     "ark": {
-      "name": "Volcano Ark (Coding Plan)",
+      "name": "Volcano Ark (Exclusive API Key)",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "apiKey": "",
-        "baseURL": "https://ark.cn-beijing.volces.com/api/coding/v3"
+        "baseURL": "https://ark.cn-beijing.volces.com/api/plan/v3"
       },
       "models": {
         "ark-code-latest": {
@@ -42,22 +42,36 @@
         },
         "kimi-k2.5": {
           "name": "Kimi K2.5"
+        },
+        "doubao-seedance-2.0": {
+          "name": "Doubao Seedance 2.0 (Vision)"
+        },
+        "doubao-seedance-2.0-fast": {
+          "name": "Doubao Seedance 2.0 Fast (Vision)"
+        },
+        "doubao-seedance-1.5-pro": {
+          "name": "Doubao Seedance 1.5 Pro (Vision)"
+        },
+        "doubao-seedream-5.0-lite": {
+          "name": "Doubao Seedream 5.0 Lite (Vision)"
         }
       }
     }
   },
-  "mcpServers": {
+  "mcp": {
     "vector-search": {
-      "command": "npx",
-      "args": [
+      "type": "local",
+      "command": [
+        "npx",
         "@modelcontextprotocol/server-vector-search",
         "--provider", "openai",
-        "--api-key", "{env:ARK_API_KEY}",
-        "--base-url", "https://ark.cn-beijing.volces.com/api/coding/v3",
-        "--model", "doubao-embedding-vision-251215",
+        "--api-key", "YOUR_ARK_API_KEY_HERE",
+        "--base-url", "https://ark.cn-beijing.volces.com/api/plan/v3",
+        "--model", "doubao-embedding-vision",
         "--chunk-size", "1024",
         "--chunk-overlap", "200"
-      ]
+      ],
+      "enabled": true
     }
   },
   "permission": {

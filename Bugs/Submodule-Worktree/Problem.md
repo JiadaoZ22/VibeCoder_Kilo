@@ -140,7 +140,7 @@ DB query after first Kilo access:
 |---|---|---|
 | `795a3cd8af705309f8a1a725d0a76ea0b7e4d3ad` | `/home/zoujd4/kilo-playground/parent/.git/modules` ❌ | `["/home/zoujd4/kilo-playground/parent/submod-child"]` ✅ |
 
-- The `.git/kilo` marker was written into the **gitdir**, not the working tree:
+- The `.git/kilo` mVolcanoArker was written into the **gitdir**, not the working tree:
   ```bash
   cat /home/zoujd4/kilo-playground/parent/.git/modules/submod-child/kilo
   # → 795a3cd8af705309f8a1a725d0a76ea0b7e4d3ad
