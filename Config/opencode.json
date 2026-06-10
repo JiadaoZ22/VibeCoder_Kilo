@@ -34,14 +34,14 @@
         "glm-4.7": {
           "name": "GLM 4.7"
         },
-        "deepseek-v3.2": {
-          "name": "DeepSeek V3.2"
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro"
+        },
+        "deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash"
         },
         "kimi-k2.6": {
           "name": "Kimi K2.6"
-        },
-        "kimi-k2.5": {
-          "name": "Kimi K2.5"
         },
         "doubao-seedance-2.0": {
           "name": "Doubao Seedance 2.0 (Vision)"
@@ -58,23 +58,10 @@
       }
     }
   },
-  "mcp": {
-    "vector-search": {
-      "type": "local",
-      "command": [
-        "npx",
-        "@modelcontextprotocol/server-vector-search",
-        "--provider", "openai",
-        "--api-key", "YOUR_ARK_API_KEY_HERE",
-        "--base-url", "https://ark.cn-beijing.volces.com/api/plan/v3",
-        "--model", "doubao-embedding-vision",
-        "--chunk-size", "1024",
-        "--chunk-overlap", "200"
-      ],
-      "enabled": true
-    }
-  },
   "permission": {
-    "bash": "allow"
+    "bash": "allow",
+    "*": {
+      "*": "allow"
+    }
   }
 }

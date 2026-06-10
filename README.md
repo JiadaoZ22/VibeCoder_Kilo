@@ -146,24 +146,6 @@ All configured models are OpenAI-compatible endpoints served through Ark:
 
 Switch models anytime inside Kilo with `/models`.
 
-### Optional: Vector Search MCP (Memory Embedding)
-
-To fight **context-window exhaustion**, this config includes an optional **MCP vector-search server** that:
-
-1. Indexes your codebase locally using Ark's embedding model.
-2. Retrieves only the most relevant code snippets before each query.
-3. Injects those snippets into the LLM context automatically.
-
-#### Prerequisites
-
-```bash
-npm install -g @modelcontextprotocol/server-vector-search
-```
-
-#### Enable
-
-The `mcp` block is already present in `opencode.json`. It will be active as soon as you copy the config and restart Kilo.
-
 #### Usage
 
 ```

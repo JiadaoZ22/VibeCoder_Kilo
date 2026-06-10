@@ -1,12 +1,14 @@
 # Kilo Code
 
+> **Fixed binary installed** — if you see a Qdrant compatibility warning, see [`Bugs/IDX/a_Solution.md`](../Bugs/IDX/a_Solution.md) for the patch details.
+
 ## Set Up Kilo Code CLI
 > Refer https://kilo.ai/docs/code-with-ai/platforms/cli
 ```bash
 npm install -g @kilocode/cli
 ```
 
-### Set Up LM Providers
+## Set Up LM Providers
 
 #### OpenRouter
 - That is easy, just `kilo` and then `/connect`, and then choose `OpenRouter` and select the default model you'd like to use as favourite.
@@ -42,26 +44,7 @@ npm install -g @modelcontextprotocol/server-vector-search
 
 ### Configuration
 
-The `mcp` block has already been added to `opencode.json` in this repo. When you copy the file to `~/.config/kilo/opencode.json`, the block comes along automatically.
-
-Key parameters:
-
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| `type` | `local` | Required by Kilo's MCP schema |
-| `command` | `["npx", "@modelcontextprotocol/server-vector-search", ...]` | Command and arguments as a single array |
-| `--provider` | `openai` | Driver for OpenAI-compatible APIs |
-| `--base-url` | `https://ark.cn-beijing.volces.com/api/plan/v3` | Reuses the Ark endpoint for the Exclusive API Key plan |
-| `--api-key` | `YOUR_ARK_API_KEY_HERE` | Replace with your actual Ark API key (same key as in `provider.ark.options.apiKey`) |
-| `--model` | `doubao-embedding-vision` | Ark-compatible embedding model |
-| `--chunk-size` | `1024` | Characters per chunk |
-| `--chunk-overlap` | `200` | Overlap between adjacent chunks |
-| `enabled` | `true` | Start the MCP server automatically |
-
-### Enable / Disable
-
-- **Enable**: Keep the `mcp` object in `opencode.json`.
-- **Disable**: Remove (or comment out) the entire `mcp` block and restart Kilo.
+Add an `mcp` block to your `opencode.json` with your preferred embedding provider and settings.
 
 ### Usage
 
@@ -85,12 +68,3 @@ Key parameters:
    ```
    > Explain the user authentication flow in this project
    ```
-
-### Troubleshooting
-
-| Symptom | Likely Cause | Fix |
-|---------|--------------|-----|
-| `vector-search` not in `/mcp list` | MCP server not installed or crashed on start | Re-run `npm install -g @modelcontextprotocol/server-vector-search`; check Node version (`node -v`) |
-| Index command fails with auth error | API key missing or invalid | Ensure `ARK_API_KEY` is exported in your shell, or hard-code the key in the `mcp.vector-search.command` array |
-| Retrieved chunks are irrelevant | Chunk size / overlap mismatch for your codebase | Tune `--chunk-size` and `--chunk-overlap` in `opencode.json` |
-| Slow indexing | Large repo or network latency to Ark | Exclude large generated directories (`node_modules`, `dist`, `.git`) by passing `--exclude` to the index command |

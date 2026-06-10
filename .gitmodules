@@ -1,0 +1,4 @@
+[submodule "kilo-source"]
+	path = kilo-source
+	url = https://github.com/JiadaoZ22/kilocode.git
+	branch = fix/qdrant-check-compatibility
