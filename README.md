@@ -14,6 +14,51 @@ This repository stores the configuration files and documentation for running [Ki
 
 ---
 
+## Build from Source (Recommended)
+
+> **The stock `npm install -g @kilocode/cli` package contains known upstream bugs** — most notably the Qdrant "Failed to obtain server version" warning on every startup, plus several indexing (IDX) reliability issues. To get a clean, bug-free experience, **build and install your own binary from the patched source** included in this repository.
+
+### Why Build Yourself?
+
+| Problem | Stock npm package | Our forked source |
+|---------|------------------|-------------------|
+| Qdrant compatibility warning | ❌ Appears on every launch | ✅ Patched (`checkCompatibility: false`) |
+| Code indexing (IDX) stability | ❌ Unreliable, frequent ENOSPC / watcher errors | ✅ Qdrant fix + LanceDB defaults remain stable |
+| Ability to apply your own fixes | ❌ Black-box binary | ✅ Full TypeScript source in `kilo-source/` |
+
+### Quick Build
+
+This repo already includes the forked source as a submodule (`kilo-source/`).
+
+```bash
+# 1. Initialize the submodule (if you haven't already)
+git submodule update --init --recursive
+
+# 2. Enter the source directory
+cd kilo-source
+
+# 3. Install dependencies
+bun install
+
+# 4. Build for your current platform only
+cd packages/opencode
+bun run script/build.ts --single
+
+# 5. Replace the system-installed binary
+#    (adjust path if your npm global prefix differs)
+cp dist/@kilocode/cli-linux-x64/bin/kilo \
+   ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+
+# 6. Verify
+kilo --version
+```
+
+> **Tip:** Keep the original binary as a backup: `cp ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo.backup`
+
+For the full technical breakdown of the patch, see [`Bugs/IDX/a_Solution.md`](Bugs/IDX/a_Solution.md).
+
+---
+
 ## Quick Start
 
 ### 1. Install Kilo
@@ -99,18 +144,6 @@ Kilo preserves every session automatically. To “rewind” to a previous chat:
 
 If you only want to rewind a few turns in the *current* chat, use `/undo` instead.
 
-### MCP (Vector Search) Commands
-
-If you enabled the vector-search MCP server:
-
-| Command | Action |
-|---------|--------|
-| `/mcp list` | Verify that `vector-search` is connected. |
-| `/mcp call vector-search index --path .` | Index the current project. |
-| `/mcp call vector-search query --text "auth flow"` | Manually retrieve relevant snippets. |
-
-After indexing, simply ask questions in natural language and Kilo will auto-retrieve relevant code context.
-
 ### Keyboard Shortcuts
 
 | Shortcut | Function |
@@ -135,8 +168,8 @@ All configured models are OpenAI-compatible endpoints served through Ark:
 - `doubao-seed-code`
 - `minimax-latest`
 - `glm-5.1`, `glm-4.7`
-- `deepseek-v3.2`
-- `kimi-k2.6`, `kimi-k2.5`
+- `deepseek-v4-pro`, `deepseek-v4-flash`
+- `kimi-k2.6`
 
 **Vision models**
 - `doubao-seedance-2.0`
@@ -145,14 +178,6 @@ All configured models are OpenAI-compatible endpoints served through Ark:
 - `doubao-seedream-5.0-lite`
 
 Switch models anytime inside Kilo with `/models`.
-
-#### Usage
-
-```
-> /mcp list                           # verify vector-search is connected
-> /mcp call vector-search index --path .   # index current project
-> Explain the auth flow in this repo  # Kilo auto-retrieves relevant code
-```
 
 See [`Config/ReadMe.md`](Config/ReadMe.md) for full parameters, troubleshooting, and tuning tips.
 
@@ -176,23 +201,23 @@ Use **`/compact`** (or **`/summarize`**) regularly to condense conversation hist
 /compact preserve the database schema decisions and auth flow
 ```
 
-### 2. Enable Vector-Search MCP (Codebase RAG)
+### 2. Optional: Enable Vector-Search MCP (Codebase RAG)
 
-The `mcp` block in this repo's `Config/opencode.json` sets up **Retrieval-Augmented Generation (RAG)**. Instead of dumping entire files into the prompt, Kilo retrieves only the most relevant code snippets.
+> **Note:** The base `Config/opencode.json` in this repo no longer includes a pre-configured MCP block. If you want vector search, you must add it manually.
 
-**To enable it now:**
+You can set up **Retrieval-Augmented Generation (RAG)** by installing the MCP server and adding an `mcp` block to your `~/.config/kilo/opencode.json`.
+
+**To enable it:**
 ```bash
-# Copy the config with MCP (if you haven't already)
-cp Config/opencode.json ~/.config/kilo/opencode.json
-
 # Ensure the MCP server is installed
 npm install -g @modelcontextprotocol/server-vector-search
 
-# In Kilo, index your project once
+# Add the mcp block to your opencode.json (see Config/ReadMe.md for the snippet)
+# Then, in Kilo, index your project once
 > /mcp call vector-search index --path .
 ```
 
-After indexing, ask questions in natural language and Kilo auto-retrieves relevant context.
+After indexing, ask questions in natural language and Kilo auto-retrieves relevant context. See [`Config/ReadMe.md`](Config/ReadMe.md) for the full configuration snippet.
 
 ### 3. Session Hygiene — Don't Let Sessions Grow Forever
 
@@ -212,7 +237,7 @@ Switch to a high-capacity model before long-haul tasks:
 | Model | Typical Context | Best For |
 |-------|----------------|----------|
 | `kimi-k2.6` | Very long (200K+) | Massive codebases, long sessions |
-| `deepseek-v3.2` | Long (128K+) | Deep reasoning, large files |
+| `deepseek-v4-pro` | Long (128K+) | Deep reasoning, large files |
 | `doubao-seed-2.0-pro` | Medium-long | Balanced speed / capacity |
 
 Switch anytime with `> /models`.
@@ -229,9 +254,6 @@ Switch anytime with `> /models`.
 # Start Kilo for a new task
 kilo
 
-# Index the project (do this once per major change)
-> /mcp call vector-search index --path .
-
 # Work normally...
 
 # When context feels heavy (~10+ turns or slow responses)
@@ -245,11 +267,13 @@ kilo
 > /new                       # start fresh
 ```
 
-**The combination of RAG + proactive `/compact` + session discipline** is the most effective way to prevent context bloat.
+**Proactive `/compact` + session discipline** is the most effective way to prevent context bloat. Add the optional vector-search MCP only if you frequently work in very large codebases where manual context management isn't enough.
 
 ---
 
 ## Known Issues & Workarounds
+
+> **Upstream vs. This Fork:** Many of the issues below are present in the **stock npm package** (`npm install -g @kilocode/cli`). If you build from the patched source in this repo's `kilo-source/` submodule, several indexing-related bugs (Qdrant warnings, ENOSPC watcher exhaustion) are already fixed. TUI-level bugs (session rendering, clipboard) may still apply until upstream resolves them.
 
 ### Session History Missing in TUI `/sessions`
 
