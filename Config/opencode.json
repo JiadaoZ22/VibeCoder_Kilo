@@ -1,6 +1,17 @@
 {
   "$schema": "https://app.kilo.ai/config.json",
   "model": "ark/ark-code-latest",
+  "indexing": {
+    "enabled": true,
+    "provider": "openai-compatible",
+    "model": "doubao-embedding-vision",
+    "dimension": 2048,
+    "vectorStore": "lancedb",
+    "openai-compatible": {
+      "apiKey": "",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/v3"
+    }
+  },
   "provider": {
     "ark": {
       "name": "Volcano Ark (Exclusive API Key)",

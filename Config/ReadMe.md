@@ -44,7 +44,25 @@ npm install -g @modelcontextprotocol/server-vector-search
 
 ### Configuration
 
-Add an `mcp` block to your `opencode.json` with your preferred embedding provider and settings.
+For Kilo's built-in code indexing with Volcano Ark embeddings, add an `indexing` block to `opencode.json`:
+
+```json
+{
+  "indexing": {
+    "enabled": true,
+    "provider": "openai-compatible",
+    "model": "doubao-embedding-vision",
+    "dimension": 2048,
+    "vectorStore": "lancedb",
+    "openai-compatible": {
+      "apiKey": "{env:ARK_API_KEY}",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3"
+    }
+  }
+}
+```
+
+Use `/api/plan/v3` for embeddings when using a Coding Plan exclusive API key. A standard Ark API key may use `/api/v3`, but the configured exclusive key returns 401 there.
 
 ### Usage
 

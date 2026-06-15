@@ -109,3 +109,520 @@ All `toHaveBeenCalledWith` / `toHaveBeenLastCalledWith` expectations that assert
 
 - Qdrant JS client source (`qdrant-client.js`, lines 60-72): shows the `checkCompatibility` default and the warning emission logic.
 - Kilo Code repository: `https://github.com/Kilo-Org/kilocode`
+
+---
+
+## Update: Doubao Embedding IDX Still Fails
+
+### Correction Summary: What Was Incorrect vs Necessary
+
+The earlier troubleshooting mixed together three separate issues. Only some of the steps were actually necessary for the IDX failure.
+
+#### Incorrect or Misleading Steps
+
+1. **Using `/api/v3` for the Coding Plan exclusive API key was incorrect.**
+
+   The configured key works for:
+
+   ```text
+   https://ark.cn-beijing.volces.com/api/plan/v3
+   ```
+
+   It returned HTTP 401 on:
+
+   ```text
+   https://ark.cn-beijing.volces.com/api/v3
+   ```
+
+2. **Saying `doubao-embedding-vision` was not an IDX-compatible embedding model was incorrect.**
+
+   Direct testing confirmed `doubao-embedding-vision` returns a 2048-dimensional embedding vector from `/api/plan/v3/embeddings`, so it can be used by Kilo IDX as an OpenAI-compatible embedding model.
+
+3. **The Qdrant compatibility warning fix was not the IDX failure fix.**
+
+   Adding `checkCompatibility: false` only suppresses the Qdrant startup warning. It does not fix Ark/Doubao embedding requests, endpoint authentication, or vector dimension mismatches.
+
+4. **The source patch alone was not enough.**
+
+   Passing `dimensions` into the OpenAI-compatible embedder is useful, but IDX still fails if the config points to the wrong Ark endpoint.
+
+#### Necessary Steps to Fix the Actual IDX Bug
+
+1. **Use the patched Kilo binary that passes `indexing.dimension` to OpenAI-compatible embedding requests.**
+
+   Verify:
+
+   ```bash
+   kilo --version
+   ```
+
+   Expected:
+
+   ```text
+   0.0.0-fix-qdrant-check-compatibility-202606151259
+   ```
+
+2. **Configure IDX with the working Ark Coding Plan endpoint.**
+
+   Required config:
+
+   ```json
+   {
+     "indexing": {
+       "enabled": true,
+       "provider": "openai-compatible",
+       "model": "doubao-embedding-vision",
+       "dimension": 2048,
+       "vectorStore": "lancedb",
+       "openai-compatible": {
+         "apiKey": "{env:ARK_API_KEY}",
+         "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3"
+       }
+     }
+   }
+   ```
+
+3. **Use `dimension: 2048`.**
+
+   The verified Ark response for `doubao-embedding-vision` returns 2048-dimensional vectors. The vector store must be created with the same dimension.
+
+4. **Rebuild the local index after changing endpoint/model/dimension.**
+
+   If an older failed index exists, remove it before re-indexing:
+
+   ```bash
+   rm -rf ~/.local/share/kilo/indexing
+   ```
+
+5. **Restart Kilo and run `/indexing`.**
+
+   Kilo must be restarted after config changes so the indexing worker receives the corrected settings.
+
+### What Was Wrong or Incomplete Above
+
+The Qdrant fix above is still valid, but it only fixes the startup warning:
+
+> "Failed to obtain server version. Unable to check client-server compatibility."
+
+It does **not** fully fix IDX when using Volcano Ark / Doubao embeddings.
+
+The missing second issue was:
+
+- Kilo accepted `indexing.dimension` in config.
+- Kilo used that dimension for the vector store.
+- But Kilo did **not** pass that dimension to the `openai-compatible` embedding request.
+- For OpenAI-compatible embedding models that support configurable output size, this can make the embedding API return vectors with a different dimension than the local index expects, causing indexing/search failure.
+
+So the earlier statement "IDX still works" was too broad. It is true for the Qdrant warning, but not true for OpenAI-compatible custom-dimension embeddings until the second source patch below is installed.
+
+### Important Correction: `doubao-embedding-vision` and Ark Endpoint
+
+`doubao-embedding-vision` is a vector embedding model, not a chat model and not a vision-generation model. It converts input into numerical vectors that Kilo IDX can store in LanceDB/Qdrant and retrieve later by semantic similarity.
+
+A direct probe with the configured Coding Plan key confirmed:
+
+```text
+POST https://ark.cn-beijing.volces.com/api/plan/v3/embeddings
+model: doubao-embedding-vision
+result: HTTP 200, model doubao-embedding-vision-251215, embedding length 2048
+```
+
+The same key against `/api/v3/embeddings` returned HTTP 401. Therefore, for this key type, `indexing.openai-compatible.baseUrl` must use `/api/plan/v3`, not `/api/v3`.
+
+## What is a Vector Embedding Model for an AI Agent?
+
+### Core Definition
+
+A vector embedding model is an AI agent's semantic memory encoder. It lets an agent remember, retrieve, and compare information outside the LLM's limited context window.
+
+At its simplest, it converts unstructured data into a fixed-length numerical vector. In this setup, `doubao-embedding-vision-251215` returns 2048 numbers. Semantically similar items are close together in vector space, and unrelated items are far apart.
+
+### How It Differs From a Chat or Vision Model
+
+A chat model generates text. A vision model interprets or generates visual content. A vector embedding model does neither directly; it encodes data for retrieval.
+
+For Kilo IDX, the embedding model is used to encode:
+
+- Source code chunks
+- Natural-language queries
+- Documentation snippets
+- Error messages
+- Tool outputs and logs
+- Task notes or state, when a system stores them for retrieval
+
+That is why `doubao-embedding-vision` belongs in the `indexing` block, not in the top-level chat `model` field.
+
+### 4 Core Functions Embeddings Enable
+
+#### 1. Semantic Memory Retrieval
+
+Kilo cannot put an entire repo into every prompt. IDX solves this by:
+
+1. Splitting files into chunks
+2. Embedding each chunk into a vector
+3. Storing vectors in a local vector store such as LanceDB
+4. Embedding the user's query
+5. Retrieving the nearest matching code chunks
+
+Example: when you ask how authentication works, IDX should retrieve the relevant auth files instead of requiring you to manually attach them.
+
+#### 2. Long Task Context Support
+
+Embeddings can help an agent retrieve relevant previous context when a task spans many steps or sessions, depending on what the application stores. Kilo IDX primarily indexes workspace code; persistent task memory is a separate capability unless explicitly implemented by the tool or MCP server.
+
+#### 3. Tool Output and Debug Retrieval
+
+When tool outputs, command logs, or errors are indexed, embeddings can help retrieve related failures or previous diagnostics without exact keyword matches.
+
+#### 4. Semantic Caching and Deduplication
+
+Systems can use embeddings to detect similar requests or repeated tool results. This is useful for semantic caches, but it is separate from Kilo's core IDX unless a cache or MCP integration explicitly uses embeddings for that purpose.
+
+### Key Properties That Matter
+
+| Property | Good Value | Why It Matters |
+|---|---|---|
+| Dimension | 1024-2048 | Higher dimensions can improve recall but cost more storage and compute. |
+| Domain fit | Code + natural language | IDX needs both source-code and user-query similarity. |
+| Consistency | Stable vectors for identical inputs | Inconsistent vectors cause missed retrievals. |
+| Speed | Fast enough for batch indexing | Slow embedding calls make initial indexing and re-indexing painful. |
+
+### What Happens Without IDX Embeddings
+
+Without a working embedding model:
+
+- Kilo cannot semantically retrieve relevant files from the repo
+- You must manually provide more context
+- Long codebase questions become less reliable
+- Search falls back to explicit file reads, grep, or user-provided context
+- Large repositories become harder to navigate within the context window
+
+### Your Specific Setup
+
+With the configured Volcano Engine Coding Plan key:
+
+- Model alias in config: `doubao-embedding-vision`
+- Resolved model returned by Ark: `doubao-embedding-vision-251215`
+- Working endpoint: `https://ark.cn-beijing.volces.com/api/plan/v3`
+- Verified vector size: 2048
+- Recommended local vector store: `lancedb`
+
+Correct Kilo IDX config:
+
+```json
+{
+  "indexing": {
+    "enabled": true,
+    "provider": "openai-compatible",
+    "model": "doubao-embedding-vision",
+    "dimension": 2048,
+    "vectorStore": "lancedb",
+    "openai-compatible": {
+      "apiKey": "{env:ARK_API_KEY}",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3"
+    }
+  }
+}
+```
+
+### Source Patch Applied
+
+File:
+
+```text
+kilo-source/packages/kilo-indexing/src/indexing/service-factory.ts
+```
+
+Changed the OpenAI-compatible embedder construction from:
+
+```typescript
+return new OpenAICompatibleEmbedder(
+  config.openAiCompatibleOptions.baseUrl,
+  config.openAiCompatibleOptions.apiKey,
+  config.modelId,
+)
+```
+
+to:
+
+```typescript
+return new OpenAICompatibleEmbedder(
+  config.openAiCompatibleOptions.baseUrl,
+  config.openAiCompatibleOptions.apiKey,
+  config.modelId,
+  undefined,
+  { dimensions: config.modelDimension },
+)
+```
+
+Added regression test:
+
+```text
+kilo-source/packages/kilo-indexing/test/kilocode/indexing/service-factory.test.ts
+```
+
+The test confirms an OpenAI-compatible request for `doubao-embedding-vision` includes:
+
+```json
+{
+  "model": "doubao-embedding-vision",
+  "dimensions": 2048
+}
+```
+
+### Installed Patched Binary
+
+Current installed binary:
+
+```bash
+kilo --version
+```
+
+Expected output:
+
+```text
+0.0.0-fix-qdrant-check-compatibility-202606151259
+```
+
+Validation already run:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/kilo-indexing
+PATH="$HOME/.bun/bin:$PATH" bun test test/kilocode/indexing/service-factory.test.ts
+PATH="$HOME/.bun/bin:$PATH" bun run typecheck
+```
+
+Results:
+
+```text
+9 pass, 0 fail
+```
+
+Typecheck also completed successfully.
+
+---
+
+## Step-by-Step: Configure Kilo IDX with Doubao Embedding
+
+### 1. Open the Global Kilo Config
+
+Kilo reads the global CLI config from:
+
+```text
+~/.config/kilo/opencode.json
+```
+
+Open it with an editor:
+
+```bash
+nano ~/.config/kilo/opencode.json
+```
+
+If the file does not exist, create it.
+
+### 2. Add or Update the `indexing` Block
+
+Inside the top-level JSON object, add this block:
+
+```json
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "indexing": {
+    "enabled": true,
+    "provider": "openai-compatible",
+    "model": "doubao-embedding-vision",
+    "dimension": 2048,
+    "vectorStore": "lancedb",
+    "openai-compatible": {
+      "apiKey": "YOUR_ARK_API_KEY_HERE",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3"
+    }
+  }
+}
+```
+
+If your config already has other fields such as `model`, `provider`, or `permission`, do **not** delete them. Just add `indexing` as another top-level field.
+
+Example merged config:
+
+```json
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "model": "ark/ark-code-latest",
+  "indexing": {
+    "enabled": true,
+    "provider": "openai-compatible",
+    "model": "doubao-embedding-vision",
+    "dimension": 2048,
+    "vectorStore": "lancedb",
+    "openai-compatible": {
+      "apiKey": "YOUR_ARK_API_KEY_HERE",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3"
+    }
+  },
+  "provider": {
+    "ark": {
+      "name": "Volcano Ark (Exclusive API Key)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "apiKey": "YOUR_ARK_API_KEY_HERE",
+        "baseURL": "https://ark.cn-beijing.volces.com/api/plan/v3"
+      },
+      "models": {
+        "ark-code-latest": {
+          "name": "Ark(VolcanoEngine) Auto: effect+speed"
+        }
+      }
+    }
+  }
+}
+```
+
+### 3. Important: Do Not Mix Up These Two Base URLs
+
+There are two different Ark URLs in this setup:
+
+| Purpose | Config field | Coding Plan exclusive-key URL |
+|---|---|---|
+| Chat/model provider | `provider.ark.options.baseURL` | `https://ark.cn-beijing.volces.com/api/plan/v3` |
+| IDX embeddings | `indexing.openai-compatible.baseUrl` | `https://ark.cn-beijing.volces.com/api/plan/v3` |
+
+For the configured Coding Plan exclusive API key, use `/api/plan/v3` in the `indexing` block. `/api/v3` returned 401 with this key.
+
+### 4. Set the API Key
+
+Replace every `YOUR_ARK_API_KEY_HERE` with your Volcano Ark API key.
+
+If you do not want to store the key directly in the file, use an environment variable instead:
+
+```json
+"apiKey": "{env:ARK_API_KEY}"
+```
+
+Then set it before starting Kilo:
+
+```bash
+export ARK_API_KEY="your-real-key"
+kilo
+```
+
+To make it permanent for Bash:
+
+```bash
+printf '\nexport ARK_API_KEY="your-real-key"\n' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### 5. Restart Kilo
+
+Close any running Kilo TUI sessions, then start a new one:
+
+```bash
+kilo
+```
+
+Verify the patched binary is active:
+
+```bash
+kilo --version
+```
+
+Expected:
+
+```text
+0.0.0-fix-qdrant-check-compatibility-202606151259
+```
+
+### 6. Rebuild the Index
+
+From inside the project you want to index:
+
+```bash
+cd /path/to/your/project
+kilo
+```
+
+In the Kilo TUI, run the indexing command:
+
+```text
+/indexing
+```
+
+Ensure indexing is enabled, then start/restart indexing from the dialog.
+
+If using the command interface directly, run the available indexing/reindex action shown by the `/indexing` dialog.
+
+### 7. Why `vectorStore: "lancedb"` Is Recommended Here
+
+Use LanceDB unless you specifically need Qdrant:
+
+```json
+"vectorStore": "lancedb"
+```
+
+Reasons:
+
+- No local Qdrant server is required.
+- No Docker service is required.
+- It avoids the Qdrant compatibility warning path entirely.
+- It is simpler for local codebase indexing.
+
+### 8. If IDX Still Fails
+
+Check these in order:
+
+1. Confirm patched binary:
+
+   ```bash
+   kilo --version
+   ```
+
+2. Confirm `~/.config/kilo/opencode.json` has:
+
+   ```json
+   "provider": "openai-compatible",
+   "model": "doubao-embedding-vision",
+   "dimension": 2048,
+   "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3"
+   ```
+
+3. Confirm the API key is not empty.
+
+4. Confirm you restarted Kilo after editing config.
+
+5. Delete the old local LanceDB index and re-index if the previous failed index used a different dimension. The index data is under Kilo's state directory, typically:
+
+   ```text
+   ~/.local/share/kilo/indexing/
+   ```
+
+   Remove only if you are okay rebuilding the index:
+
+   ```bash
+   rm -rf ~/.local/share/kilo/indexing
+   ```
+
+6. Start Kilo again and run `/indexing`.
+
+### 9. Rebuild/Install Commands Used
+
+If the patched binary must be rebuilt again, run:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo \
+  ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo.new
+chmod +x ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo.new
+mv -f ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo.new \
+  ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+kilo --version
+```
+
+Use `mv` instead of direct `cp` to `.kilo` because direct overwrite can fail with:
+
+```text
+Text file busy
+```
+
+when another Kilo process still has the binary open.
