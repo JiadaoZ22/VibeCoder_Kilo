@@ -626,3 +626,160 @@ Text file busy
 ```
 
 when another Kilo process still has the binary open.
+
+---
+
+## Update: IDX Progress Stuck at 0% / Kilo Window Freezes
+
+### Issue Observed
+
+The Kilo CLI showed indexing progress stuck at:
+
+```text
+Code Indexing
+•
+0% (0/191 files)
+Indexed 0 / 191 files (0%).
+```
+
+After leaving the Kilo window idle for a while, the TUI appeared frozen. The likely trigger was IDX scanning the workspace and then waiting indefinitely on remote embedding requests while trying to build the local code index.
+
+### Root Cause
+
+There were two separate reliability problems:
+
+1. **Remote embedding batch requests did not have a bounded request timeout.**
+
+   During initial indexing, Kilo parses files and sends code chunks to the configured embedder. If an OpenAI-compatible embedding provider stalls, the indexing scan can remain in progress indefinitely. This makes progress look frozen at `0%` or another stale value.
+
+2. **Directly overwriting the installed running binary can fail.**
+
+   The first rebuild succeeded, but installation failed with:
+
+   ```text
+   cp: cannot create regular file '/home/zoujd4/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo': Text file busy
+   ```
+
+   This happens when the current Kilo process still has `~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo` open.
+
+### Source Fix Applied
+
+Added a shared remote embedding request timeout:
+
+```typescript
+export const REMOTE_EMBEDDER_REQUEST_TIMEOUT_MS = 120_000
+```
+
+Patched these files:
+
+| File | Change |
+|---|---|
+| `kilo-source/packages/kilo-indexing/src/indexing/constants/index.ts` | Added `REMOTE_EMBEDDER_REQUEST_TIMEOUT_MS = 120_000` |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/openai.ts` | Configured the OpenAI client with `timeout: 120_000` and `maxRetries: 0` |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/openai-compatible.ts` | Configured the OpenAI-compatible client with `timeout: 120_000` and `maxRetries: 0`; direct full-URL `fetch` requests now use `AbortController` with the same timeout |
+| `kilo-source/packages/kilo-indexing/test/kilocode/indexing/embedders/kilo.test.ts` | Updated constructor expectations for the new timeout/retry options |
+
+Effect: if Ark/OpenAI-compatible embeddings stall, the batch fails after 120 seconds instead of hanging forever. Kilo can then report an indexing error/recovery state instead of appearing permanently frozen.
+
+### Validation Run
+
+Targeted tests passed:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/kilo-indexing
+PATH="$HOME/.bun/bin:$PATH" bun test \
+  test/kilocode/indexing/embedders/openai-compatible.test.ts \
+  test/kilocode/indexing/embedders/openai.test.ts \
+  test/kilocode/indexing/embedders/kilo.test.ts \
+  test/kilocode/indexing/service-factory.test.ts
+```
+
+Result:
+
+```text
+89 pass
+4 skip
+0 fail
+```
+
+Typechecks passed:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/kilo-indexing
+PATH="$HOME/.bun/bin:$PATH" bun run typecheck
+
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode
+PATH="$HOME/.bun/bin:$PATH" bun run typecheck
+```
+
+### Build Result
+
+The rebuild command used was:
+
+```bash
+(cd kilo-source/packages/opencode && PATH="$HOME/.bun/bin:$PATH" bun run script/build.ts --single --skip-install && cp dist/@kilocode/cli-linux-x64/bin/kilo ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo)
+```
+
+The build itself succeeded and smoke tests passed:
+
+```text
+Smoke test passed: 0.0.0-fix-qdrant-check-compatibility-202606151405
+Models snapshot smoke test passed
+```
+
+But the final direct `cp` failed with `Text file busy` because the old Kilo binary was still open.
+
+### Correct Install Command After Build
+
+Use a temp file plus atomic `mv`, not direct `cp` to `.kilo`:
+
+```bash
+cp kilo-source/packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo /tmp/kilo.new
+chmod +x /tmp/kilo.new
+mv -f /tmp/kilo.new ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+rm -rf ~/.local/share/kilo/indexing
+kilo --version
+```
+
+Do not paste explanatory lines such as:
+
+```text
+Expected version: 0.0.0-fix-qdrant-check-compatibility-202606151405
+```
+
+as shell commands. That causes:
+
+```text
+Expected: command not found
+```
+
+### If `bun` Is Not Found
+
+Use the local Bun path explicitly:
+
+```bash
+PATH="$HOME/.bun/bin:$PATH" bun --version
+```
+
+If that works, prefix build commands with:
+
+```bash
+PATH="$HOME/.bun/bin:$PATH"
+```
+
+If it still fails, install Bun:
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+### Final Cleanup Before Re-indexing
+
+After installing the patched binary, clear stale local IDX state and restart Kilo:
+
+```bash
+rm -rf ~/.local/share/kilo/indexing
+kilo --version
+```
+
+Then start Kilo again and run `/indexing`.
