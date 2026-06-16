@@ -783,3 +783,124 @@ kilo --version
 ```
 
 Then start Kilo again and run `/indexing`.
+
+---
+
+## Update: IDX Progress Shows 0/X with X Growing; Crash on New Session
+
+### Issue Observed
+
+1. During indexing, the TUI showed progress stuck at `0/X`, where `X` kept growing as more files were scanned (e.g., `0% (0/191 files)`, `Indexed 0 / 191 files (0%)`).
+2. When the LLM context window became too long and a new session was started, the indexing worker sometimes crashed or entered an unrecoverable error state.
+
+### Root Cause
+
+1. **Progress denominator was the parsed-so-far count, not the discovered total.**
+
+   `CodeIndexOrchestrator._runScan()` incremented `cumulativeFilesFound` every time `DirectoryScanner` finished parsing a file, while `cumulativeFilesIndexed` only advanced after a batch was embedded and upserted. Because parsing is much faster than embedding, the denominator (`totalFiles`) grew ahead of the numerator (`processedFiles`), making progress look like `0/X` for a long time. This was misleading even when indexing was proceeding normally.
+
+2. **Partially-initialized indexing manager could be reused after init failure.**
+
+   In `indexing-worker.ts`, if `CodeIndexManager.initialize()` threw, the manager variable was left pointing to a partially-initialized instance. A subsequent `search` request could then interact with broken services (e.g., a half-open LanceDB connection or an embedder in a bad state), which could crash the worker or leave it wedged. Additionally, unhandled worker message-deserialization errors had no explicit handler.
+
+### Source Fix Applied
+
+#### Fix 1: Use discovered candidate count as the progress total
+
+Modified `DirectoryScanner.scanDirectory()` to report the total number of candidate files once discovery is complete via a new `onFilesDiscovered(count)` callback. `CodeIndexOrchestrator._runScan()` now sets the progress total from this callback and only increments the numerator when batches are successfully indexed.
+
+Patched files:
+
+| File | Change |
+|---|---|
+| `kilo-source/packages/kilo-indexing/src/indexing/interfaces/file-processor.ts` | Added `onFilesDiscovered?(count: number)` to `IDirectoryScanner.scanDirectory()` signature |
+| `kilo-source/packages/kilo-indexing/src/indexing/processors/scanner.ts` | Calls `onFilesDiscovered(supportedPaths.length)` right after candidate discovery |
+| `kilo-source/packages/kilo-indexing/src/indexing/orchestrator.ts` | Uses `onFilesDiscovered` to set the progress total; progress is now `Indexed X / totalFiles` from the start of scanning |
+| `kilo-source/packages/kilo-indexing/test/kilocode/indexing/processors/scanner.test.ts` | Added regression test for `onFilesDiscovered` callback |
+
+Effect: progress now shows `Indexed 0 / 191 files` immediately after discovery, then advances as batches complete, instead of `0 / 0` climbing to `0 / 191`.
+
+#### Fix 2: Harden indexing worker lifecycle and error handling
+
+Modified `indexing-worker.ts` to dispose a partially-initialized manager when `initialize()` fails, and added an explicit guard for unknown worker methods. Modified `indexing-worker-client.ts` to handle `onmessageerror` so deserialization failures fail the worker cleanly instead of silently.
+
+Patched files:
+
+| File | Change |
+|---|---|
+| `kilo-source/packages/opencode/src/kilocode/indexing-worker.ts` | Disposes manager on init failure; explicit `init`/`search`/`dispose` routing; returns clear error for unknown methods |
+| `kilo-source/packages/opencode/src/kilocode/indexing-worker-client.ts` | Added `task.onmessageerror` handler |
+
+Effect: if initialization fails (for any reason), the worker is reset to a clean state and will not try to search with a broken manager. Message-deserialization errors are surfaced as worker failures instead of being swallowed.
+
+### Validation Run
+
+Typechecks passed:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/kilo-indexing
+PATH="$HOME/.bun/bin:$PATH" bun run typecheck
+
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode
+PATH="$HOME/.bun/bin:$PATH" bun run typecheck
+```
+
+Targeted tests passed:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/kilo-indexing
+PATH="$HOME/.bun/bin:$PATH" bun test \
+  test/kilocode/indexing/processors/scanner.test.ts \
+  test/kilocode/indexing/service-factory.test.ts
+
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode
+PATH="$HOME/.bun/bin:$PATH" bun test \
+  test/kilocode/indexing-worker.test.ts \
+  test/kilocode/indexing-startup.test.ts \
+  test/kilocode/indexing-label.test.ts \
+  test/kilocode/indexing-feature.test.ts \
+  test/kilocode/indexing-auth.test.ts \
+  test/kilocode/indexing-worktree.test.ts
+```
+
+Result: all tests passed.
+
+### Build & Install
+
+Build command used:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+```
+
+Install command used (atomic `mv` to avoid `Text file busy`):
+
+```bash
+cp kilo-source/packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo /tmp/kilo.new
+chmod +x /tmp/kilo.new
+mv -f /tmp/kilo.new ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+kilo --version
+```
+
+Expected version:
+
+```text
+0.0.0-fix-qdrant-check-compatibility-202606160224
+```
+
+### Next Steps for the User
+
+1. Confirm the patched binary:
+
+   ```bash
+   kilo --version
+   ```
+
+2. If you want to re-index from scratch to verify the new progress behavior, clear the local index:
+
+   ```bash
+   rm -rf ~/.local/share/kilo/indexing
+   ```
+
+3. Start Kilo and run `/indexing`. You should now see progress like `Indexed 0 / 191 files` immediately after discovery, with the numerator increasing as batches finish.
