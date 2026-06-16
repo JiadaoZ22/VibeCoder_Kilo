@@ -18,7 +18,9 @@ If you ever need to revert to the stock binary:
 cp ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo.backup \
    ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
 ```
-
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source                                                                                
+bun install   # or npm install if bun is available                                                                                                  
+bun run build # or check package scripts for the CLI build 
 ---
 
 ## Problem
