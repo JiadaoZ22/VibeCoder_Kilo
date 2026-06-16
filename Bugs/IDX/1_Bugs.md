@@ -88,3 +88,73 @@ Project-level configuration: `.kilo/kilo.json` in your project directory
 
 ## Date
 2026-06-10
+
+---
+
+# Fix: Doubao/Ark Embedding "max 10, got 60" Batch Error
+
+## Problem
+During code indexing the scan fails with:
+
+```text
+Failed during initial scan: Indexing failed: Failed to process batch after 3 retries:
+Embedding request failed after 3 attempts with status 400:
+400 The parameter `input` specified in the request are not valid:
+Embeddings API input limit exceeded: max 10, got 60.
+```
+
+Progress appears stuck at `0% (0/N files)` and then errors out.
+
+## Root Cause
+The configured OpenAI-compatible embedding provider (Volcano Ark / Doubao) caps the number of `input` strings per `/embeddings` request at **10**. Kilo's default embedding batch size is **60**, so every batch was rejected.
+
+## Solution Applied
+Patched the OpenAI-compatible embedder to cap request input length at the provider limit.
+
+### Files changed
+| File | Change |
+|---|---|
+| `kilo-source/packages/kilo-indexing/src/indexing/constants/index.ts` | Added `OPENAI_COMPATIBLE_MAX_BATCH_INPUTS = 10` |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/openai-compatible.ts` | Batches are now split once they reach 10 inputs, regardless of the higher-level `embeddingBatchSize` setting |
+| `kilo-source/packages/kilo-indexing/test/kilocode/indexing/embedders/openai-compatible.test.ts` | Regression test verifying a 15-item batch is split into 10 + 5 |
+
+### Immediate workaround (before patch)
+Set the top-level `indexing.embeddingBatchSize` option to `10` in your Kilo config:
+
+```json
+{
+  "indexing": {
+    "enabled": true,
+    "provider": "openai-compatible",
+    "model": "doubao-embedding-vision",
+    "dimension": 2048,
+    "vectorStore": "lancedb",
+    "embeddingBatchSize": 10,
+    "openai-compatible": {
+      "apiKey": "{env:ARK_API_KEY}",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3"
+    }
+  }
+}
+```
+
+### Build & install (already done)
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo /tmp/kilo.new
+chmod +x /tmp/kilo.new
+mv -f /tmp/kilo.new ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+```
+
+### Clear stale index and restart
+```bash
+rm -rf ~/.local/share/kilo/indexing
+kilo --version
+```
+
+Then start Kilo and run `/indexing`.
+
+## Date
+2026-06-16

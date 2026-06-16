@@ -965,3 +965,123 @@ If you also want global access-control denies, put the same patterns in `~/.kilo
 - `~/.config/kilo/kilo.json` — `watcher.ignore` added so the file watcher also skips those directories.
 
 Without these exclusions, IDX may open thousands of large files (e.g., `.nii.gz` neuroimaging data, full `.venv` site-packages) and appear stuck while CPU and memory usage stay high.
+
+---
+
+## Update: Doubao/Ark Embedding Input Limit (max 10, got 60)
+
+### Issue Observed
+
+After the progress-stuck fix, indexing still failed during the first scan with:
+
+```text
+Failed during initial scan: Indexing failed: Failed to process batch after 3 retries:
+Embedding request failed after 3 attempts with status 400:
+400 The parameter `input` specified in the request are not valid:
+Embeddings API input limit exceeded: max 10, got 60.
+```
+
+### Root Cause
+
+The Volcano Ark / Doubao `/embeddings` endpoint limits the `input` array to **10 items** per request. Kilo's default embedding batch size is **60** (and the scanner also groups up to 60 code segments before calling the embedder), so every embedding request was rejected with HTTP 400.
+
+### Source Fix Applied
+
+The OpenAI-compatible embedder now enforces its own per-request input cap, independent of the higher-level batching configuration.
+
+Patched files:
+
+| File | Change |
+|---|---|
+| `kilo-source/packages/kilo-indexing/src/indexing/constants/index.ts` | Added `OPENAI_COMPATIBLE_MAX_BATCH_INPUTS = 10` |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/openai-compatible.ts` | The batch-building loop stops adding items once the request reaches 10 inputs, then submits the current batch and continues with the remaining texts |
+| `kilo-source/packages/kilo-indexing/test/kilocode/indexing/embedders/openai-compatible.test.ts` | Regression test: a 15-item input is split into two SDK calls (10 + 5) |
+
+Effect: even if the scanner/file-watcher passes 60 segments to the embedder, the embedder internally sends 6 requests of 10 items each, keeping Ark/Doubao happy. The final embedding array returned to the scanner still has the same length and order, so progress tracking and indexing logic are unchanged.
+
+### Immediate Workaround (No Source Change Required)
+
+If you cannot reinstall the patched binary right away, set the top-level `embeddingBatchSize` option to `10` in your Kilo config:
+
+```json
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "indexing": {
+    "enabled": true,
+    "provider": "openai-compatible",
+    "model": "doubao-embedding-vision",
+    "dimension": 2048,
+    "vectorStore": "lancedb",
+    "embeddingBatchSize": 10,
+    "openai-compatible": {
+      "apiKey": "{env:ARK_API_KEY}",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3"
+    }
+  }
+}
+```
+
+This makes the scanner pass at most 10 items per batch, which also satisfies the provider limit.
+
+### Validation Run
+
+Targeted tests passed:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/kilo-indexing
+PATH="$HOME/.bun/bin:$PATH" bun test \
+  test/kilocode/indexing/embedders/openai-compatible.test.ts \
+  test/kilocode/indexing/embedders/openai-compatible-rate-limit.test.ts \
+  test/kilocode/indexing/service-factory.test.ts
+```
+
+Result:
+
+```text
+60 pass
+7 skip
+0 fail
+```
+
+Typecheck passed:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/kilo-indexing
+PATH="$HOME/.bun/bin:$PATH" bun run typecheck
+```
+
+### Build & Install
+
+Because the running Kilo binary was still open, the old process was stopped first, then the build ran and the binary was replaced atomically:
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo /tmp/kilo.new
+chmod +x /tmp/kilo.new
+mv -f /tmp/kilo.new ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+
+kilo --version
+# Expected: public-7.3.42_private-0.0.0
+```
+
+### Final Cleanup and Restart
+
+Clear any failed partial index and restart Kilo:
+
+```bash
+rm -rf ~/.local/share/kilo/indexing
+kilo
+```
+
+Then run `/indexing` in the TUI. The scan should now progress normally and complete without the `max 10, got 60` error.
+
+### Why This Is Safe
+
+- The cap only affects how the embedder chunks its HTTP requests; the number, order, and content of returned embeddings are unchanged.
+- For providers that support larger batches, the existing `embeddingBatchSize` config still controls scanner/file-watcher batching; the embedder-level cap is a hard ceiling for OpenAI-compatible endpoints.
+- LanceDB still stores all vectors as before; only the upstream embedding API call pattern changes.
+
+### Date
+2026-06-16
