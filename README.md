@@ -271,6 +271,53 @@ kilo
 
 ---
 
+## Avoid Over-Indexing
+
+Kilo's codebase indexer scans every file under the workspace root that is not excluded by `.gitignore`, `.kilocodeignore`, or the global `~/.kilocode/.kiloindexignore` (plus a small hardcoded list such as `node_modules`, `.git`, `__pycache__`). If the workspace contains large/binary/dependency directories, indexing can hang, consume excessive CPU/memory, or take a very long time.
+
+### Two different ignore mechanisms
+
+| File | Affects IDX | Affects agent tools | Best for |
+|---|---|---|---|
+| `~/.kilocode/.kiloindexignore` | ✅ Yes | ❌ No | **Machine-wide indexing-only exclusions** (e.g. `Data/`, `.venv*`, `*.nii.gz`). The agent can still read or edit these paths when you explicitly ask it to. |
+| `~/.kilocode/.kilocodeignore` | ✅ Yes | ✅ Yes | **Machine-wide access-control exclusions**. Patterns here are converted to permission denies, so the agent cannot touch those paths unless you add a negation rule. |
+| Workspace `.gitignore` | ✅ Yes | ❌ No | Project-specific indexing exclusions that also apply to Git. |
+| Workspace `.kilocodeignore` | ✅ Yes | ✅ Yes | Project-specific access-control exclusions. |
+
+### Recommended global indexing-only ignore
+
+Create `~/.kilocode/.kiloindexignore` (one per machine) with patterns like:
+
+```text
+# Large / binary data
+Data/
+*.nii.gz
+*.nii
+
+# Python virtual environments
+.venv*
+.venv.*/
+
+# Runtime/status directories
+.dataprep_status/
+__pycache__/
+```
+
+Because `.kiloindexignore` is **indexing-only**, commands like these still work:
+
+```text
+> read Data/subject_001.nii.gz
+> edit the script under .venv.zoujd4-Legion/bin/
+```
+
+If you also want to deny tool access globally, add the same patterns to `~/.kilocode/.kilocodeignore` instead (or in addition). A negated line such as `!Data/README.md` inside `.kilocodeignore` can re-allow a specific file after a broader deny rule.
+
+This patched binary also loads a global file-watcher ignore list from `~/.config/kilo/kilo.json` (`watcher.ignore`), which prevents Kilo from watching those directories for live changes.
+
+Without these exclusions, IDX may open thousands of large files (e.g., `.nii.gz` neuroimaging data, full `.venv` site-packages) and appear stuck while CPU and memory usage stay high.
+
+---
+
 ## Known Issues & Workarounds
 
 > **Upstream vs. This Fork:** Many of the issues below are present in the **stock npm package** (`npm install -g @kilocode/cli`). If you build from the patched source in this repo's `kilo-source/` submodule, several indexing-related bugs (Qdrant warnings, ENOSPC watcher exhaustion) are already fixed. TUI-level bugs (session rendering, clipboard) may still apply until upstream resolves them.

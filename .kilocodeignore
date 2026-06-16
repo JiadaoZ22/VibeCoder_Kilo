@@ -1,1 +1,8 @@
 kilo-source/
+Data/
+.venv*
+.venv.*/
+.dataprep_status/
+*.nii.gz
+*.nii
+__pycache__/

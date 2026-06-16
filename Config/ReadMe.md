@@ -86,3 +86,26 @@ Use `/api/plan/v3` for embeddings when using a Coding Plan exclusive API key. A 
    ```
    > Explain the user authentication flow in this project
    ```
+
+---
+
+## Avoid Over-Indexing (Built-in `/indexing`)
+
+If you use Kilo's built-in `/indexing` feature (separate from the MCP server above), keep large/binary/dependency directories out of the index with a machine-wide ignore file:
+
+- **`~/.kilocode/.kiloindexignore`** — indexing-only exclusions. IDX skips these paths, but the agent can still read or edit them when explicitly asked.
+- **`~/.kilocode/.kilocodeignore`** — access-control exclusions. IDX skips these paths **and** the agent's tools are denied access unless you add a negation rule.
+
+Example `~/.kilocode/.kiloindexignore`:
+
+```text
+Data/
+.venv*
+.venv.*/
+.dataprep_status/
+*.nii.gz
+*.nii
+__pycache__/
+```
+
+See [`README.md`](../README.md) for the full explanation and the source patch that makes the global indexing ignore work.

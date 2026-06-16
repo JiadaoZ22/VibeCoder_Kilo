@@ -906,3 +906,62 @@ Expected version:
    ```
 
 3. Start Kilo and run `/indexing`. You should now see progress like `Indexed 0 / 191 files` immediately after discovery, with the numerator increasing as batches finish.
+
+---
+
+## Update: Avoid Over-Indexing
+
+Even with the fixes above, IDX can still hang or run for hours if the workspace contains huge/binary directories that the scanner tries to parse and embed. Kilo's indexer respects root-level `.gitignore` and `.kilocodeignore`, but its hardcoded ignore list only covers common build/vendor folders (`node_modules`, `dist`, `__pycache__`, etc.), not project-specific data directories.
+
+### Two different global ignore files
+
+This patched binary introduces a **machine-wide indexing-only ignore file** that is separate from `.kilocodeignore`:
+
+| File | Affects IDX | Affects agent tools | Use when |
+|---|---|---|---|
+| `~/.kilocode/.kiloindexignore` | ✅ Yes | ❌ No | You want IDX to skip large/binary/dependency directories but still let the agent read or edit them on explicit request. |
+| `~/.kilocode/.kilocodeignore` | ✅ Yes | ✅ Yes | You want both IDX and the agent's tools to stay away from those paths. |
+| Workspace `.gitignore` | ✅ Yes | ❌ No | The project already tracks Git ignores and you want IDX to reuse them. |
+| Workspace `.kilocodeignore` | ✅ Yes | ✅ Yes | You need project-specific access control. |
+
+### Source patch
+
+File: `kilo-source/packages/kilo-indexing/src/indexing/shared/load-ignore.ts`
+
+The indexer now loads `~/.kilocode/.kiloindexignore` before the workspace-level `.gitignore`/`.kilocodeignore`. It is merged into the same `ignore` instance used by the scanner, so global indexing exclusions apply to every workspace.
+
+### Recommended global indexing-only ignore
+
+Create `~/.kilocode/.kiloindexignore`:
+
+```text
+# Large / binary data
+Data/
+*.nii.gz
+*.nii
+
+# Python virtual environments
+.venv*
+.venv.*/
+
+# Runtime/status directories
+.dataprep_status/
+__pycache__/
+```
+
+Because `.kiloindexignore` is **not** fed into the ignore-to-permissions migrator, you can still ask the agent:
+
+```text
+> read Data/OASIS-4/OAS42213_MR_d3028/orig.nii.gz
+> edit 1_DevEnv/x86-CUDA/.venv.zoujd4-Legion/bin/some-script.py
+```
+
+If you also want global access-control denies, put the same patterns in `~/.kilocode/.kilocodeignore`. Negation rules such as `!Data/README.md` can re-allow specific paths.
+
+### Deployment on this machine
+
+- `~/.kilocode/.kiloindexignore` — created with the patterns above.
+- `~/.kilocode/.kilocodeignore` — left empty (no global tool denies).
+- `~/.config/kilo/kilo.json` — `watcher.ignore` added so the file watcher also skips those directories.
+
+Without these exclusions, IDX may open thousands of large files (e.g., `.nii.gz` neuroimaging data, full `.venv` site-packages) and appear stuck while CPU and memory usage stay high.
