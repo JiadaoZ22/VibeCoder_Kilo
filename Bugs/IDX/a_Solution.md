@@ -1085,3 +1085,90 @@ Then run `/indexing` in the TUI. The scan should now progress normally and compl
 
 ### Date
 2026-06-16
+
+---
+
+## Update: Semantic Search Returns Empty Results on Doubao/Ark Embeddings
+
+### Issue Observed
+
+After indexing completed successfully (`Code Indexing • Complete • Index up-to-date. File queue empty.`), `semantic_search` returned no relevant results while `codesearch` (text search) still returned matches. The LanceDB vector table for the workspace contained tens of thousands of rows (e.g. 33,551 rows, 2048 dimensions) and self-similarity search on the table worked, so the vectors themselves were fine.
+
+### Root Cause
+
+Doubao/Ark instruction-tuned embedding models (e.g. `doubao-embedding-vision`, `doubao-embedding-text-240515`, `doubao-embedding-large-text-250515`) require a retrieval-instruction prefix on **query** text, while **documents** must be embedded without that prefix. The official Volcano Ark docs state:
+
+> `query_instruction = "为这个句子生成表示以用于检索相关文章："`
+> `document = "..."` (no instruction)
+
+Kilo's embedder had a single `queryPrefix` that was applied to **both** queries and documents, and the `openai-compatible` provider registry had no Doubao entries at all. As a result:
+
+- Documents were embedded without any prefix (correct, by accident).
+- Search queries were also embedded without any prefix (incorrect).
+- Query and document vectors ended up in mismatched semantic spaces, so cosine similarity stayed below the `minScore` threshold and no results were returned.
+
+### Source Fix Applied
+
+Introduced a `context` parameter to the embedder interface so callers can distinguish `query` embeddings from `document` embeddings. The query prefix is now applied **only** when `context === "query"`.
+
+Patched files:
+
+| File | Change |
+|---|---|
+| `kilo-source/packages/kilo-indexing/src/indexing/interfaces/embedder.ts` | Added optional `context?: "query" \| "document"` parameter to `createEmbeddings` |
+| `kilo-source/packages/kilo-indexing/src/indexing/model-registry.ts` | Added Doubao/Ark model profiles with dimensions, score thresholds, and Chinese/English retrieval query prefixes |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/openai-compatible.ts` | Applies query prefix only for `context === "query"`; defaults to document context |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/openai.ts` | Same context-aware prefix behavior |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/ollama.ts` | Same context-aware prefix behavior |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/voyage.ts` | Same context-aware prefix behavior |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/openrouter.ts` | Same context-aware prefix behavior |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/gemini.ts` | Passes `context` through to underlying OpenAI-compatible embedder |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/mistral.ts` | Passes `context` through to underlying OpenAI-compatible embedder |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/vercel-ai-gateway.ts` | Passes `context` through to underlying OpenAI-compatible embedder |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/kilo.ts` | Passes `context` through to underlying OpenAI-compatible embedder |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/bedrock.ts` | Updated signature for interface compatibility |
+| `kilo-source/packages/kilo-indexing/src/indexing/search-service.ts` | Calls `createEmbeddings([query], undefined, "query")` |
+| `kilo-source/packages/kilo-indexing/src/indexing/processors/scanner.ts` | Calls `createEmbeddings(batchTexts, undefined, "document")` |
+| `kilo-source/packages/kilo-indexing/src/indexing/processors/file-watcher.ts` | Calls `createEmbeddings(texts, undefined, "document")` |
+| `kilo-source/packages/kilo-indexing/test/kilocode/indexing/processors/scanner.test.ts` | Updated test fake signature |
+| `kilo-source/packages/kilo-indexing/test/kilocode/indexing/embedders/openai-compatible.test.ts` | Added regression test verifying Doubao prefix is applied only for query context |
+
+### Validation
+
+- Full `kilo-indexing` test suite: **429 pass, 9 skip, 0 fail**.
+- `kilo-indexing` typecheck: clean.
+
+### What This Means for the Existing Index
+
+The existing LanceDB index was built with documents embedded **without** the query prefix. After the patch, search queries are embedded **with** the prefix, which matches Doubao's intended retrieval format. Therefore:
+
+- **No re-indexing is required** for the existing workspace.
+- `semantic_search` should now return relevant results against the existing vectors.
+- Future indexing runs will continue to embed documents without the prefix, keeping behavior consistent.
+
+### Build & Install
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo /tmp/kilo.new
+chmod +x /tmp/kilo.new
+mv -f /tmp/kilo.new ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+
+kilo --version
+# Expected: public-7.3.42_private-0.0.0
+```
+
+### Restart and Test
+
+Start Kilo in the `E2E_DK_Parcellation:main` workspace and try a natural-language search, e.g.:
+
+```
+semantic_search: "training script for nnUNet"
+```
+
+It should now return ranked code chunks instead of "No relevant code found".
+
+### Date
+2026-06-16

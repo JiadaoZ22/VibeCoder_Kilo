@@ -158,3 +158,50 @@ Then start Kilo and run `/indexing`.
 
 ## Date
 2026-06-16
+
+---
+
+# Fix: Semantic Search Returns Nothing with Doubao/Ark Embeddings
+
+## Problem
+
+Indexing shows `Code Indexing • Complete • Index up-to-date. File queue empty.`, but `semantic_search` returns no results while `codesearch` still works. The vector table is not empty (e.g. 33k+ rows).
+
+## Root Cause
+
+Doubao/Ark instruction-tuned embedding models require a retrieval-instruction prefix on **queries** but **not** on **documents**. Kilo's embedder had no Doubao registry entries and applied prefixes to both contexts, so query vectors ended up in a different semantic space from document vectors. Cosine similarity stayed below the threshold and no results were returned.
+
+Official Doubao guidance:
+
+```text
+query_instruction = "为这个句子生成表示以用于检索相关文章："
+document = "..."  # no instruction
+```
+
+## Solution Applied
+
+Added a `context` parameter (`"query" | "document"`) to the embedder interface. Query prefixes are now applied only when `context === "query"`. Documents are embedded without the prefix.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `kilo-source/packages/kilo-indexing/src/indexing/interfaces/embedder.ts` | `createEmbeddings` accepts `context` |
+| `kilo-source/packages/kilo-indexing/src/indexing/model-registry.ts` | Added Doubao model profiles + query prefixes |
+| `kilo-source/packages/kilo-indexing/src/indexing/embedders/*.ts` | Context-aware prefix application / passthrough |
+| `kilo-source/packages/kilo-indexing/src/indexing/search-service.ts` | Calls `createEmbeddings([query], undefined, "query")` |
+| `kilo-source/packages/kilo-indexing/src/indexing/processors/scanner.ts` | Calls `createEmbeddings(batchTexts, undefined, "document")` |
+| `kilo-source/packages/kilo-indexing/src/indexing/processors/file-watcher.ts` | Calls `createEmbeddings(texts, undefined, "document")` |
+| `kilo-source/packages/kilo-indexing/test/...` | Updated fakes + regression test |
+
+### Validation
+
+- `bun test` in `packages/kilo-indexing`: 429 pass, 9 skip, 0 fail
+- `bun run typecheck` in `packages/kilo-indexing`: clean
+
+### Important: No Re-indexing Required
+
+Existing LanceDB vectors were already embedded without the query prefix (the old default). The patch adds the prefix only to new search queries, matching the model's expected retrieval format. Start Kilo and try `semantic_search` again.
+
+## Date
+2026-06-16
