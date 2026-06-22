@@ -205,3 +205,56 @@ Existing LanceDB vectors were already embedded without the query prefix (the old
 
 ## Date
 2026-06-16
+
+---
+
+# Fix: `/settings` Slash Command Crashes Kilo
+
+## Problem
+
+Typing `/settings` (or `/config`, `/prefs`) in the TUI crashes Kilo instead of opening the Settings dialog.
+
+## Root Cause
+
+`DialogSettings` (`packages/opencode/src/cli/cmd/tui/component/dialog-settings.tsx`) was reading three values from `useTuiConfig()` that do not exist on that context:
+
+- `tuiConfig.kv` → key-value store is actually in the `KV` context (`useKV`).
+- `tuiConfig.mode` → theme mode is actually in the `Theme` context (`useTheme().mode`).
+- `tuiConfig.locked` → theme lock state is actually in the `Theme` context (`useTheme().locked`).
+
+These `undefined` accesses caused an immediate render crash.
+
+A second crash then appeared:
+
+```text
+Error: CommandPalette context must be used within a CommandPaletteProvider
+  at src/cli/cmd/tui/context/command-palette.tsx:65:25
+  at src/cli/cmd/tui/component/dialog-settings.tsx:10:19
+```
+
+`DialogSettings` was also calling `useCommandPalette()`, but dialogs are rendered outside the `CommandPaletteProvider` tree.
+
+## Solution Applied
+
+Updated `DialogSettings` to use the correct contexts:
+
+| Before | After |
+|---|---|
+| `const tuiConfig = useTuiConfig()` + `const kv = tuiConfig.kv` | `const kv = useKV()` |
+| `tuiConfig.mode` | `theme.mode()` from `useTheme()` |
+| `tuiConfig.locked` | `theme.locked()` from `useTheme()` |
+| `useCommandPalette()` + `palette.run(option.value)` | `useOpencodeKeymap()` + `keymap.dispatchCommand(option.value)` |
+
+File changed: `kilo-source/packages/opencode/src/cli/cmd/tui/component/dialog-settings.tsx`
+
+## Validation
+
+- `bun run typecheck` in `packages/opencode`: `dialog-settings.tsx` is clean.
+- Built and installed patched binary.
+
+## Restart and Test
+
+Start Kilo and type `/settings`. The Settings dialog should open normally.
+
+## Date
+2026-06-22

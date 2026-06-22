@@ -24,6 +24,10 @@ This repository stores the configuration files and documentation for running [Ki
 |---------|------------------|-------------------|
 | Qdrant compatibility warning | ❌ Appears on every launch | ✅ Patched (`checkCompatibility: false`) |
 | Code indexing (IDX) stability | ❌ Unreliable, frequent ENOSPC / watcher errors | ✅ Qdrant fix + LanceDB defaults remain stable |
+| Ark/Doubao embedding batch size | ❌ `max 10, got 60` error | ✅ Batched to provider limit (10) |
+| Semantic search with Doubao embeddings | ❌ Returns empty results | ✅ Query-instruction prefix applied only to queries |
+| `/compact` on large sessions | ❌ Appears frozen with no progress | ✅ Live chunking progress shown |
+| `/settings` slash command | ❌ Crashes with context errors | ✅ Uses correct TUI contexts |
 | Ability to apply your own fixes | ❌ Black-box binary | ✅ Full TypeScript source in `kilo-source/` |
 
 ### Quick Build
@@ -37,16 +41,16 @@ git submodule update --init --recursive
 # 2. Enter the source directory
 cd kilo-source
 
-# 3. Install dependencies
+# 3. Install dependencies (only needed once)
 bun install
 
 # 4. Build for your current platform only
-cd packages/opencode
-bun run script/build.ts --single
+#    Use --skip-install after the first build to save time.
+bun run --cwd packages/opencode script/build.ts --single --skip-install
 
 # 5. Replace the system-installed binary
 #    (adjust path if your npm global prefix differs)
-cp dist/@kilocode/cli-linux-x64/bin/kilo \
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo \
    ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
 
 # 6. Verify
@@ -54,8 +58,10 @@ kilo --version
 ```
 
 > **Tip:** Keep the original binary as a backup: `cp ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo.backup`
+>
+> **Note:** The version string shown by `kilo --version` is generated from the **last git commit timestamp** on the current branch, not the build time. Don't be surprised if it shows an earlier date than when you built it.
 
-For the full technical breakdown of the patch, see [`Bugs/IDX/a_Solution.md`](Bugs/IDX/a_Solution.md).
+For the full technical breakdown of the patches, see [`Bugs/IDX/a_Solution.md`](Bugs/IDX/a_Solution.md).
 
 ---
 

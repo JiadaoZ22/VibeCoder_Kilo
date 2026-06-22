@@ -1172,3 +1172,113 @@ It should now return ranked code chunks instead of "No relevant code found".
 
 ### Date
 2026-06-16
+
+---
+
+## Update: `/settings` Slash Command Crashes Kilo
+
+### Issue Observed
+
+Typing `/settings` (or `/config`, `/prefs`) in the TUI caused Kilo to crash immediately instead of opening the Settings dialog.
+
+### Root Cause
+
+`DialogSettings` in `packages/opencode/src/cli/cmd/tui/component/dialog-settings.tsx` was reading three properties that do not exist on `TuiConfig.Resolved`:
+
+| Broken reference | What it actually is | Result |
+|---|---|---|
+| `tuiConfig.kv` | Key-value store lives in the separate `KV` context (`useKV`) | `Cannot read properties of undefined (reading 'get')` |
+| `tuiConfig.mode` | Theme mode lives in the `Theme` context (`useTheme().mode`) | `Cannot read properties of undefined (reading ...)` |
+| `tuiConfig.locked` | Theme lock state lives in the `Theme` context (`useTheme().locked`) | same |
+
+The component was apparently written against an older or different context shape. As soon as the dialog rendered, any of these undefined accesses caused a Solid/JS render crash.
+
+After fixing the above, a second crash appeared:
+
+```text
+Error: CommandPalette context must be used within a CommandPaletteProvider
+  at src/cli/cmd/tui/context/command-palette.tsx:65:25
+  at src/cli/cmd/tui/component/dialog-settings.tsx:10:19
+```
+
+This happened because `DialogSettings` also called `useCommandPalette()`, but the dialog is rendered **outside** the `CommandPaletteProvider` tree (the provider is a child of `DialogProvider`).
+
+### Source Fix Applied
+
+| File | Change |
+|---|---|
+| `kilo-source/packages/opencode/src/cli/cmd/tui/component/dialog-settings.tsx` | Replaced `useTuiConfig()` misuse with `useKV()` for key-value settings, `useTheme()` for theme mode/lock state, and `useOpencodeKeymap()` for dispatching selected commands |
+
+Updated imports:
+
+```tsx
+import { useSync } from "@tui/context/sync"
+import { useTheme } from "@tui/context/theme"
+import { useKV } from "@tui/context/kv"
+import { useOpencodeKeymap } from "../keymap"
+```
+
+Updated hook usage:
+
+```tsx
+const sync = useSync()
+const theme = useTheme()
+const keymap = useOpencodeKeymap()
+const kv = useKV()
+```
+
+Updated command dispatch:
+
+```tsx
+<DialogSelect
+  title="Settings"
+  options={options}
+  skipFilter
+  onSelect={(option) => {
+    keymap.dispatchCommand(option.value)
+  }}
+/>
+```
+
+Updated theme option titles:
+
+```tsx
+{
+  value: "theme.switch_mode",
+  title: theme.mode() === "dark" ? "Switch to light mode" : "Switch to dark mode",
+  category: "Appearance",
+},
+{
+  value: "theme.mode.lock",
+  title: theme.locked() ? "Unlock theme mode" : "Lock theme mode",
+  category: "Appearance",
+},
+```
+
+All `kv.get(...)` calls now work because `kv` is the real `KV` context, and command dispatch works because `useOpencodeKeymap()` is provided above `DialogProvider`.
+
+### Validation
+
+- `bun run typecheck` in `packages/opencode`: no errors in `dialog-settings.tsx` (only pre-existing unrelated `KILO_DISPLAY_VERSION` errors).
+- Built patched binary successfully.
+
+### Build & Install
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo /tmp/kilo.new
+chmod +x /tmp/kilo.new
+mv -f /tmp/kilo.new ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+
+kilo --version
+# Expected: public-7.3.42_private-0.0.0
+```
+
+### Restart and Test
+
+Start Kilo and type `/settings`. The Settings dialog should open without crashing, showing options for model, agent, MCP, indexing, theme, behavior, etc.
+
+### Date
+2026-06-22
