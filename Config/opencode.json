@@ -36,6 +36,9 @@
         "doubao-seed-code": {
           "name": "Doubao Seed Code"
         },
+        "doubao-seed-evolving": {
+          "name": "Doubao Seed Evolving (Coding & Agent, weekly upgrade)"
+        },
         "minimax-latest": {
           "name": "MiniMax M2.7"
         },

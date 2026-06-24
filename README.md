@@ -172,6 +172,7 @@ All configured models are OpenAI-compatible endpoints served through Ark:
 - `ark-code-latest` (Auto-routing)
 - `doubao-seed-2.0-code` / `pro` / `lite`
 - `doubao-seed-code`
+- `doubao-seed-evolving` (Coding & Agent, weekly upgrade — [Volcano Ark docs](https://www.volcengine.com/docs/82379))
 - `minimax-latest`
 - `glm-5.1`, `glm-4.7`
 - `deepseek-v4-pro`, `deepseek-v4-flash`
