@@ -334,3 +334,213 @@ kilo --version
 
 ### Date
 2026-06-25
+
+---
+
+## Build & Verification Log (Compaction Fix)
+
+### Timestamps
+- Build started: 2026-06-25 17:12:xx CST
+- Build completed: 2026-06-25 17:17:04 CST
+- Binary installed: 2026-06-25 17:17:10 CST
+- Version verified: 2026-06-25 17:17:10 CST
+- Benchmark run: 2026-06-25 17:17:35 CST
+
+### Build Commands
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+```
+
+Build output version: `public-7.3.42_private-0.0.0`
+
+### Install Commands
+```bash
+cp ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo \
+   ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo.before-compaction-fix
+
+cp /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo \
+   ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+
+chmod +x ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+```
+
+### Installed Version
+```bash
+~/.npm-global/bin/kilo --version
+# public-7.3.42_private-0.0.0
+```
+
+### Benchmark Result
+A micro-benchmark comparing the old serial loop vs the new batched-concurrent loop (9 chunks, 100 ms simulated latency per chunk, concurrency = 3):
+
+| Mode | Time | Speedup |
+|---|---|---|
+| Serial (old regression) | 909.6 ms | 1.0× |
+| Batched concurrent (fix) | 310.7 ms | **2.93×** |
+
+Script: `Bugs/IDX/benchmark-compaction.ts`
+
+Run with:
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode
+PATH="$HOME/.bun/bin:$PATH" bun /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/Bugs/IDX/benchmark-compaction.ts
+```
+
+### Notes
+- The previous running Kilo process (PID 2243128) was terminated before build because it was locking the in-use `dist/@kilocode/cli-linux-x64/bin/kilo` binary.
+- Restart Kilo to load the patched binary.
+- Real-world `/compact` speedup depends on provider latency and chunk count; theoretical maximum is ~3× for latency-bound chunks.
+
+### Date
+2026-06-25
+
+---
+
+## Real-Code Compaction Benchmark
+
+### Timestamp
+Run: **2026-06-25 17:22:xx CST**
+
+### Test File
+`kilo-source/packages/opencode/test/kilocode/session-compaction-chunks-benchmark.test.ts`
+
+### What It Tests
+Uses the actual `SessionCompaction.Service.process` code path with:
+- A session containing 6 large user/assistant pairs (enough to force chunk fallback)
+- A fake `SessionProcessor` that sleeps 100 ms per chunk to simulate LLM latency
+- The patched `KiloCompactionChunks.process` logic
+
+### Result
+```text
+Benchmark: 7 chunks, elapsed 423.2 ms, serial estimate 700 ms, concurrent estimate 500 ms
+(pass) KiloCompactionChunks benchmark > processes chunks concurrently (3-at-a-time) [907.01ms]
+```
+
+| Metric | Value |
+|---|---|
+| Chunks processed | 7 |
+| Simulated LLM latency per chunk | 100 ms |
+| Serial estimate | 700 ms |
+| Actual elapsed (patched) | 423.2 ms |
+| Real speedup | **~1.65×** |
+
+The real-code speedup is lower than the ideal 3× because of session/Effect overhead, but it is still significantly faster than the serial regression. The test also asserts elapsed time is well below the serial estimate.
+
+### Run It Yourself
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode
+PATH="$HOME/.bun/bin:$PATH" bun test test/kilocode/session-compaction-chunks-benchmark.test.ts
+```
+
+### Date
+2026-06-25
+
+---
+
+# Efficiency Update: Indexing and Compaction
+
+## Timestamp
+- Changes applied: **2026-06-25 17:20–17:47 CST**
+- Build completed: **2026-06-25 17:45 CST**
+- Binary installed: **2026-06-25 17:46 CST**
+
+## Goal
+Improve the efficiency of code indexing and context compaction while preserving Ark Engine API compatibility.
+
+## Changes Applied
+
+### 1. Embedder-aware batch sizing for indexing
+**Problem:** The scanner accumulated up to 60 code segments per batch, but the OpenAI-compatible embedder (used for Ark/Doubao) split each batch into 6 serial 10-input requests. This made indexing unnecessarily slow.
+
+**Solution:** Added `maxBatchInputs` to the `IEmbedder` interface. The scanner now sizes batches to the embedder's single-request limit, so each batch becomes one embedding request.
+
+| Provider | `maxBatchInputs` |
+|---|---|
+| `openai-compatible` (generic, used for Ark) | 10 (preserves Ark compatibility) |
+| `openai` (native) | 2048 |
+| `ollama` | Infinity |
+| `openrouter` | Infinity |
+| `voyage` | Infinity |
+| `bedrock` | 1 |
+| `gemini`, `mistral`, `vercel-ai-gateway`, `kilo` | Infinity (via wrapper option) |
+
+**Files changed:**
+- `kilo-source/packages/kilo-indexing/src/indexing/interfaces/embedder.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/openai-compatible.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/openai.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/ollama.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/bedrock.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/openrouter.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/voyage.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/gemini.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/mistral.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/vercel-ai-gateway.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/embedders/kilo.ts`
+- `kilo-source/packages/kilo-indexing/src/indexing/processors/scanner.ts`
+
+### 2. Avoid stat() storm during scan
+**Problem:** The scanner ran `fs.stat()` on every path returned by `glob`, including thousands of ignored/non-code files.
+
+**Solution:** Moved extension and ignore-pattern filtering before the `stat()` call. `stat()` now runs only on code-candidate files.
+
+**File changed:** `kilo-source/packages/kilo-indexing/src/indexing/processors/scanner.ts`
+
+### 3. Concurrent reduce step in compaction
+**Problem:** The recursive summary reduction in `reduce()` ran with `concurrency: 1`, serializing the second phase of compaction.
+
+**Solution:** Increased reduce concurrency to `Math.min(CONCURRENCY, groups.length)` (up to 3).
+
+**File changed:** `kilo-source/packages/opencode/src/kilocode/session/compaction-chunks.ts`
+
+### 4. Existing compaction concurrency fix preserved
+The batched-concurrent chunk summarization fix (3 chunks at a time) remains in place.
+
+## Validation
+
+### Typecheck
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/kilo-indexing
+bun run typecheck        # clean
+
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode
+bun run typecheck        # clean
+```
+
+### Tests
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/kilo-indexing
+bun test                 # 429 pass, 9 skip, 0 fail
+
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode
+bun test test/kilocode/session-compaction-chunks.test.ts test/kilocode/session-compaction-chunks-benchmark.test.ts
+# 8 pass, 0 fail
+```
+
+### Benchmarks
+- Real-code compaction (7 chunks, 100 ms simulated latency): **414 ms** vs serial estimate **700 ms** → **~1.7× faster**
+- Standalone compaction pattern (9 chunks): **307 ms** vs serial **911 ms** → **2.97× faster**
+
+### Build & Install
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+bun run --cwd packages/opencode script/build.ts --single --skip-install
+
+cp ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo \
+   ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo.before-efficiency-updates
+
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo \
+   ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+
+chmod +x ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+kilo --version           # public-7.3.42_private-0.0.0
+```
+
+## Ark Compatibility
+The generic `openai-compatible` provider keeps `maxBatchInputs = 10`, so Ark/Doubao `/embeddings` requests stay within the provider's input limit. All efficiency gains for Ark come from:
+- Smaller, parallel batches (10 inputs × up to 10 concurrent batches)
+- Fewer `stat()` calls on ignored files
+- Concurrent compaction reduction
+
+## Date
+2026-06-25
