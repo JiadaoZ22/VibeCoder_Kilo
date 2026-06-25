@@ -68,71 +68,38 @@ Use `/api/plan/v3` for embeddings when using a Coding Plan exclusive API key. A 
 
 If your workspace contains large experimental outputs (e.g. FreeSurfer `data_roots`, training logs, model checkpoints), exclude them from indexing. Otherwise the indexer will waste time and API quota on thousands of small data JSON files and appear stuck at a low percentage.
 
-> **Important:** Kilo uses **two separate** ignore mechanisms:
+> **Important:** Kilo uses **three separate** ignore mechanisms:
 >
-> | Mechanism | What it controls | Where to put it |
-> |---|---|---|
-> | `watcher.ignore` in Kilo config | The `@parcel/watcher` file watcher (CPU/filesystem events) | `~/.config/kilo/opencode.json` or `.kilo/kilo.json` |
-> | `.kilocodeignore` / `.gitignore` | The IDX scanner (what gets embedded) | Workspace root (`<project>/.kilocodeignore`) |
-> | `~/.kilocode/.kiloindexignore` | IDX-only exclusions, machine-wide | `~/.kilocode/.kiloindexignore` |
+> | Mechanism | What it controls | Affects agent tools | Where to put it |
+> |---|---|---|---|
+> | `watcher.ignore` in Kilo config | The `@parcel/watcher` file watcher (CPU/filesystem events) | No | `~/.config/kilo/opencode.json` or `.kilo/kilo.json` |
+> | `.kilocodeignore` / `.gitignore` | IDX scanner + agent access control | Yes | Workspace root (`<project>/.kilocodeignore`) |
+> | `~/.kilocode/.kiloindexignore` | IDX scanner only | No | `~/.kilocode/.kiloindexignore` |
 >
-> `watcher.ignore` does **not** prevent files from being embedded. To stop IDX from indexing data/model files, add them to `.kilocodeignore` (project-level) or `~/.kilocode/.kiloindexignore` (global).
+> `watcher.ignore` does **not** prevent files from being embedded. To stop IDX from indexing data/model files, add them to `.kilocodeignore` (project-level, also blocks agent tools) or `~/.kilocode/.kiloindexignore` (global, indexing-only).
 
-#### Project-level `.kilocodeignore` (recommended)
+#### Recommended: machine-wide type-based ignore (`~/.kilocode/.kiloindexignore`)
 
-Create or edit `<your-project>/.kilocodeignore`. Example for a neuroimaging / ML project:
+The best place for data-type filtering is the global indexing-only ignore file. It applies to every workspace, does **not** restrict agent tool access, and follows file types rather than fragile folder paths.
+
+Create or edit `~/.kilocode/.kiloindexignore`:
 
 ```text
-# === Dependency / package / tool caches ===
-node_modules/
-.pnpm/
-.yarn/
-.venv*/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.egg-info/
-dist/
-build/
-.next/
-.nuxt/
-.vite/
-.turbo/
-.cache/
-.parcel-cache/
-
-# === Editor / agent metadata ===
-.kilo/
-.kilocode/
-.kiloindex/
-.vscode/
-.idea/
-.zed/
-
-# === Logs and runtime outputs ===
-0_Logs/
-logs/
-*.log
-
-# === Data / prep / output directories (prune early during traversal) ===
-# Directory patterns are much cheaper than file patterns: they stop the
-# scanner/file-watcher from descending into generated data trees at all.
+# === Common data / output directories (type-based) ===
 Data/
-x_Report/
-*/2_DataPrep/
-*/1_DataSync/
-*/runs/
-*/models/
-2_QuickStart/**/runs/
-2_QuickStart/**/data_roots/
-
-# === Generated data / model / binary artifacts ===
+data/
 data_roots/
 datasets/
 checkpoints/
 weights/
+runs/
+logs/
 
+# === Medical imaging ===
+*.nii
+*.nii.gz
+
+# === Model weights / serialized tensors ===
 *.pth
 *.pt
 *.ckpt
@@ -146,12 +113,14 @@ weights/
 *.pkl
 *.pickle
 *.joblib
+
+# === Tabular / serialized data ===
 *.parquet
 *.csv
 *.tsv
-*.nii
-*.nii.gz
+*.jsonl
 
+# === Binary media / archives / documents ===
 *.png
 *.jpg
 *.jpeg
@@ -165,21 +134,47 @@ weights/
 *.gz
 *.rar
 *.7z
+
+# === Tool caches / environments ===
+node_modules/
+__pycache__/
+.venv*/
+.venv.*/
+.cache/
+.parcel-cache/
+*.egg-info/
 ```
 
-This keeps **code scripts, text documents, and project config files** in the index while skipping data/model binaries.
+This keeps **code scripts, text documents, and project config files** in the index while skipping data/model binaries, regardless of where they live.
 
-> **Note for large data directories:** File-level patterns like `*.nii.gz` still force the indexer to enumerate every file inside a data tree before filtering it out. If a directory contains thousands of generated files, ignore the whole directory (e.g. `Data/`, `*/2_DataPrep/`, `2_QuickStart/**/runs/`). The patched Kilo binary also passes these patterns into `glob()` so directory pruning happens during traversal, not after.
+> **Directory pruning vs file filtering:** Directory patterns (e.g. `Data/`, `runs/`) are much cheaper than file patterns because they stop the scanner from descending into entire trees. File patterns (e.g. `*.nii.gz`) are still needed for files scattered under mixed directories. The patched Kilo binary passes these patterns into `glob()` so pruning happens during traversal, not after.
 
-#### Optional: also reduce watcher load
+#### Optional: workspace `.kilocodeignore`
 
-Add a `watcher.ignore` block to your Kilo config so the file watcher does not watch the same directories:
+Use the workspace file only for project-specific exclusions or when you also want to deny agent-tool access to a path. Keep it short and avoid hard-coding paths that may change:
+
+```text
+# Project-specific generated outputs
+0_Logs/
+x_Report/
+```
+
+#### Optional: reduce the file watcher load
+
+Add a `watcher.ignore` block to your Kilo config so the file watcher does not watch data directories:
 
 ```json
 {
   "watcher": {
     "ignore": [
       "Data/**",
+      "data/**",
+      "data_roots/**",
+      "datasets/**",
+      "checkpoints/**",
+      "weights/**",
+      "runs/**",
+      "logs/**",
       ".venv*",
       ".dataprep_status/**",
       "**/*.nii.gz",
@@ -188,7 +183,6 @@ Add a `watcher.ignore` block to your Kilo config so the file watcher does not wa
       ".kilo/**",
       "node_modules/**",
       "0_Logs/**",
-      "2_QuickStart/**/runs/**/data_roots/**",
       "**/*.pth",
       "**/*.ckpt",
       "**/*.safetensors",

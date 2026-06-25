@@ -1314,65 +1314,26 @@ Even after adding file-level patterns such as `*.nii.gz`, the indexer still had 
 
 ### Fix Applied
 
-#### 1. Workspace `.kilocodeignore` — directory pruning + file patterns
+#### 1. Machine-wide indexing-only ignore — type-based filtering
 
-Updated the workspace `.kilocodeignore` to keep **code scripts, text documents, and project config files** while excluding generated data/model/binary artifacts. Added directory-level patterns so chokidar and `glob()` prune entire data trees instead of descending into them.
-
-File: `<workspace>/.kilocodeignore`
+Created `~/.kilocode/.kiloindexignore` with **data-type** patterns instead of project-specific paths. This file is loaded by IDX in every workspace but does **not** feed into agent access-control, so the agent can still read or edit excluded files when explicitly asked.
 
 ```text
-# === Dependency / package / tool caches ===
-node_modules/
-.pnpm/
-.yarn/
-.venv*/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.egg-info/
-dist/
-build/
-.next/
-.nuxt/
-.vite/
-.turbo/
-.cache/
-.parcel-cache/
-
-# === Editor / agent metadata ===
-.kilo/
-.kilocode/
-.kiloindex/
-.vscode/
-.idea/
-.zed/
-
-# === Logs and runtime outputs ===
-0_Logs/
-logs/
-*.log
-
-# === Data / prep / output directories (prune early during traversal) ===
+# === Common data / output directories (type-based) ===
 Data/
-x_Report/
-*/2_DataPrep/
-*/1_DataSync/
-*/runs/
-*/models/
-Dev_x86-CUDA/2_DataPrep/
-Pretrain_x86-CUDA/2_DataPrep/
-Posttrain_x86-CUDA/1_DataSync/
-Deploy_x86-CUDA/models/
-2_QuickStart/**/runs/
-2_QuickStart/**/data_roots/
-
-# === Generated data / model / binary artifacts ===
+data/
 data_roots/
 datasets/
 checkpoints/
 weights/
+runs/
+logs/
 
+# === Medical imaging ===
+*.nii
+*.nii.gz
+
+# === Model weights / serialized tensors ===
 *.pth
 *.pt
 *.ckpt
@@ -1386,12 +1347,14 @@ weights/
 *.pkl
 *.pickle
 *.joblib
+
+# === Tabular / serialized data ===
 *.parquet
 *.csv
 *.tsv
-*.nii
-*.nii.gz
+*.jsonl
 
+# === Binary media / archives / documents ===
 *.png
 *.jpg
 *.jpeg
@@ -1405,17 +1368,31 @@ weights/
 *.gz
 *.rar
 *.7z
+
+# === Tool caches / environments ===
+node_modules/
+__pycache__/
+.venv*/
+.venv.*/
+.cache/
+.parcel-cache/
+*.egg-info/
 ```
 
-Also created a machine-wide indexing-only ignore file for the same patterns:
+Using data types (e.g. `*.nii.gz`, `*.pth`, `checkpoints/`) instead of fragile paths (e.g. `Dev_x86-CUDA/2_DataPrep/`) makes the ignore list survive project reorganizations.
+
+#### 2. Workspace `.kilocodeignore` — minimal project-specific exclusions
+
+Reduced the workspace file to only project-specific directories that should also be excluded from agent access control:
 
 ```text
-~/.kilocode/.kiloindexignore
+0_Logs/
+x_Report/
 ```
 
-This file is loaded by IDX but **not** fed into agent access-control, so the agent can still read or edit excluded paths when explicitly asked.
+All type-based data/model exclusions now live in `~/.kilocode/.kiloindexignore`.
 
-#### 2. Source patch — prune ignored directories inside `glob()`
+#### 3. Source patch — prune ignored directories inside `glob()`
 
 The `DirectoryScanner` previously used `glob("**/*", { ignore: FileIgnore.PATTERNS })` and only applied `.kilocodeignore`/`.gitignore` **after** enumerating all files. That meant data directories with thousands of files were still traversed.
 
@@ -1428,7 +1405,7 @@ Patched files:
 | `kilo-source/packages/kilo-indexing/src/indexing/service-factory.ts` | Accepts `ignorePatterns` and forwards them to `DirectoryScanner` |
 | `kilo-source/packages/kilo-indexing/src/indexing/processors/scanner.ts` | `glob()` now uses `[...FileIgnore.PATTERNS, ...ignorePatterns]` so ignored data directories are pruned during traversal |
 
-Effect: the scanner no longer walks into `Data/`, `*/2_DataPrep/`, `*/runs/`, or other ignored trees. This eliminates the thousands of open file descriptors and lets indexing start embedding actual code/doc/config files immediately.
+Effect: the scanner no longer walks into `Data/`, `runs/`, `checkpoints/`, or other ignored trees. This eliminates the thousands of open file descriptors and lets indexing start embedding actual code/doc/config files immediately.
 
 ### Build & Install
 
@@ -1457,9 +1434,9 @@ In the TUI run `/indexing`. With the directory pruning fix, the file count shoul
 
 ### Why This Is Safe
 
-- `.kilocodeignore` only affects what IDX embeds. The agent can still read or edit excluded files when explicitly asked.
+- `~/.kilocode/.kiloindexignore` only affects what IDX embeds. The agent can still read or edit excluded files when explicitly asked.
 - Project config JSONs, source code, Markdown docs, and other text files remain indexed because they are not matched by the ignore patterns.
-- Directory patterns such as `*/2_DataPrep/` and `2_QuickStart/**/runs/` stop the scanner from descending into generated-output trees entirely.
+- Type-based patterns (`*.nii.gz`, `*.pth`, `checkpoints/`, `runs/`) work regardless of where the data files live, so project reorganizations will not silently re-index them.
 - The source patch keeps the existing post-filter behavior as a safety net; `ignoreInstance.ignores()` is still applied after `glob()`.
 
 ### Date
