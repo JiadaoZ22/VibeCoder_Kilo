@@ -64,6 +64,49 @@ For Kilo's built-in code indexing with Volcano Ark embeddings, add an `indexing`
 
 Use `/api/plan/v3` for embeddings when using a Coding Plan exclusive API key. A standard Ark API key may use `/api/v3`, but the configured exclusive key returns 401 there.
 
+### Avoid Indexing Generated Data
+
+If your workspace contains large experimental outputs (e.g. FreeSurfer `data_roots`, training logs, model checkpoints), exclude them from indexing. Otherwise the indexer will waste time and API quota on thousands of small data JSON files and appear stuck at a low percentage.
+
+Add a `watcher.ignore` block to your Kilo config (global or project-level `.kilo/kilo.json`):
+
+```json
+{
+  "watcher": {
+    "ignore": [
+      "Data/**",
+      ".venv*",
+      ".dataprep_status/**",
+      "**/*.nii.gz",
+      "**/*.nii",
+      "__pycache__",
+      ".kilo/**",
+      "node_modules/**",
+      "0_Logs/**",
+      "2_QuickStart/**/runs/**/data_roots/**",
+      "**/*.pth",
+      "**/*.ckpt",
+      "**/*.safetensors",
+      "**/*.h5",
+      "**/*.npz",
+      "**/*.pkl",
+      "**/*.pt",
+      "**/*.bin",
+      "**/*.onnx",
+      "**/*.log",
+      "**/*.out"
+    ]
+  }
+}
+```
+
+After editing the config, **restart Kilo** and clear the old index if it was already stuck:
+
+```bash
+rm -rf ~/.local/state/kilo/indexing
+kilo
+```
+
 ### Usage
 
 1. **Restart Kilo** so the MCP server is loaded:

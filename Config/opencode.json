@@ -12,6 +12,31 @@
       "baseUrl": "https://ark.cn-beijing.volces.com/api/v3"
     }
   },
+  "watcher": {
+    "ignore": [
+      "Data/**",
+      ".venv*",
+      ".dataprep_status/**",
+      "**/*.nii.gz",
+      "**/*.nii",
+      "__pycache__",
+      ".kilo/**",
+      "node_modules/**",
+      "0_Logs/**",
+      "2_QuickStart/**/runs/**/data_roots/**",
+      "**/*.pth",
+      "**/*.ckpt",
+      "**/*.safetensors",
+      "**/*.h5",
+      "**/*.npz",
+      "**/*.pkl",
+      "**/*.pt",
+      "**/*.bin",
+      "**/*.onnx",
+      "**/*.log",
+      "**/*.out"
+    ]
+  },
   "provider": {
     "ark": {
       "name": "Volcano Ark (Exclusive API Key)",
