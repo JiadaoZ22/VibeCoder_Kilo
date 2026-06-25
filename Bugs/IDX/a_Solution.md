@@ -1310,9 +1310,13 @@ Kilo's indexer loads workspace `.gitignore` and `.kilocodeignore`, but the proje
 
 The hardcoded `FileIgnore` list inside `kilo-indexing` covers common build/vendor folders but not project-specific experimental outputs. As a result, the scanner discovered thousands of data files and appeared stuck while embedding them.
 
+Even after adding file-level patterns such as `*.nii.gz`, the indexer still had to **enumerate** every file inside large data directories before filtering them out. With **4,875+** `.nii.gz` files open simultaneously and **16,000+** total open file descriptors, the file watcher and glob traversal were saturating the process before any embedding could finish.
+
 ### Fix Applied
 
-Updated the workspace `.kilocodeignore` to keep **code scripts, text documents, and project config files** while excluding generated data/model/binary artifacts.
+#### 1. Workspace `.kilocodeignore` — directory pruning + file patterns
+
+Updated the workspace `.kilocodeignore` to keep **code scripts, text documents, and project config files** while excluding generated data/model/binary artifacts. Added directory-level patterns so chokidar and `glob()` prune entire data trees instead of descending into them.
 
 File: `<workspace>/.kilocodeignore`
 
@@ -1349,14 +1353,25 @@ build/
 logs/
 *.log
 
-# === Generated data / model / binary artifacts ===
+# === Data / prep / output directories (prune early during traversal) ===
 Data/
+x_Report/
+*/2_DataPrep/
+*/1_DataSync/
+*/runs/
+*/models/
+Dev_x86-CUDA/2_DataPrep/
+Pretrain_x86-CUDA/2_DataPrep/
+Posttrain_x86-CUDA/1_DataSync/
+Deploy_x86-CUDA/models/
+2_QuickStart/**/runs/
+2_QuickStart/**/data_roots/
+
+# === Generated data / model / binary artifacts ===
 data_roots/
 datasets/
-models/
 checkpoints/
 weights/
-runs/*/data_roots/
 
 *.pth
 *.pt
@@ -1392,23 +1407,60 @@ runs/*/data_roots/
 *.7z
 ```
 
-Also updated `Config/ReadMe.md` to clarify that `watcher.ignore` only affects the file watcher; the IDX scanner is controlled by `.kilocodeignore` (workspace) and `~/.kilocode/.kiloindexignore` (global indexing-only).
+Also created a machine-wide indexing-only ignore file for the same patterns:
+
+```text
+~/.kilocode/.kiloindexignore
+```
+
+This file is loaded by IDX but **not** fed into agent access-control, so the agent can still read or edit excluded paths when explicitly asked.
+
+#### 2. Source patch — prune ignored directories inside `glob()`
+
+The `DirectoryScanner` previously used `glob("**/*", { ignore: FileIgnore.PATTERNS })` and only applied `.kilocodeignore`/`.gitignore` **after** enumerating all files. That meant data directories with thousands of files were still traversed.
+
+Patched files:
+
+| File | Change |
+|---|---|
+| `kilo-source/packages/kilo-indexing/src/indexing/shared/load-ignore.ts` | Added `loadIgnorePatterns()` to expose raw gitignore-style strings from `.gitignore`, `.kilocodeignore`, and `~/.kilocode/.kiloindexignore` |
+| `kilo-source/packages/kilo-indexing/src/indexing/manager.ts` | Loads patterns alongside the `Ignore` instance and passes them to the service factory |
+| `kilo-source/packages/kilo-indexing/src/indexing/service-factory.ts` | Accepts `ignorePatterns` and forwards them to `DirectoryScanner` |
+| `kilo-source/packages/kilo-indexing/src/indexing/processors/scanner.ts` | `glob()` now uses `[...FileIgnore.PATTERNS, ...ignorePatterns]` so ignored data directories are pruned during traversal |
+
+Effect: the scanner no longer walks into `Data/`, `*/2_DataPrep/`, `*/runs/`, or other ignored trees. This eliminates the thousands of open file descriptors and lets indexing start embedding actual code/doc/config files immediately.
+
+### Build & Install
+
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo /tmp/kilo.new
+chmod +x /tmp/kilo.new
+mv -f /tmp/kilo.new ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+
+kilo --version
+# Expected: public-7.3.42_private-0.0.0
+```
 
 ### Cleanup and Restart
 
-Because the existing LanceDB index already contained partial/stuck data for this workspace, the local index was cleared:
+Stop any running Kilo sessions, clear the stale local index, and restart:
 
 ```bash
 rm -rf ~/.local/state/kilo/indexing/lancedb
+kilo
 ```
 
-Then restart Kilo and run `/indexing`. With the new `.kilocodeignore`, the file count should drop dramatically (from tens of thousands to the actual code/doc/config set) and indexing should proceed at normal speed.
+In the TUI run `/indexing`. With the directory pruning fix, the file count should drop dramatically (from tens of thousands to the actual code/doc/config set) and indexing should proceed at normal speed.
 
 ### Why This Is Safe
 
 - `.kilocodeignore` only affects what IDX embeds. The agent can still read or edit excluded files when explicitly asked.
 - Project config JSONs, source code, Markdown docs, and other text files remain indexed because they are not matched by the ignore patterns.
-- `data_roots/` and `runs/*/data_roots/` patterns catch the FreeSurfer-generated JSONs that caused the stall.
+- Directory patterns such as `*/2_DataPrep/` and `2_QuickStart/**/runs/` stop the scanner from descending into generated-output trees entirely.
+- The source patch keeps the existing post-filter behavior as a safety net; `ignoreInstance.ignores()` is still applied after `glob()`.
 
 ### Date
 2026-06-25

@@ -91,14 +91,21 @@ node_modules/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
 .egg-info/
 dist/
 build/
+.next/
+.nuxt/
+.vite/
+.turbo/
 .cache/
+.parcel-cache/
 
 # === Editor / agent metadata ===
 .kilo/
 .kilocode/
+.kiloindex/
 .vscode/
 .idea/
 .zed/
@@ -108,14 +115,23 @@ build/
 logs/
 *.log
 
-# === Generated data / model / binary artifacts ===
+# === Data / prep / output directories (prune early during traversal) ===
+# Directory patterns are much cheaper than file patterns: they stop the
+# scanner/file-watcher from descending into generated data trees at all.
 Data/
+x_Report/
+*/2_DataPrep/
+*/1_DataSync/
+*/runs/
+*/models/
+2_QuickStart/**/runs/
+2_QuickStart/**/data_roots/
+
+# === Generated data / model / binary artifacts ===
 data_roots/
 datasets/
-models/
 checkpoints/
 weights/
-runs/*/data_roots/
 
 *.pth
 *.pt
@@ -152,6 +168,8 @@ runs/*/data_roots/
 ```
 
 This keeps **code scripts, text documents, and project config files** in the index while skipping data/model binaries.
+
+> **Note for large data directories:** File-level patterns like `*.nii.gz` still force the indexer to enumerate every file inside a data tree before filtering it out. If a directory contains thousands of generated files, ignore the whole directory (e.g. `Data/`, `*/2_DataPrep/`, `2_QuickStart/**/runs/`). The patched Kilo binary also passes these patterns into `glob()` so directory pruning happens during traversal, not after.
 
 #### Optional: also reduce watcher load
 

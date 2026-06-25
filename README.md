@@ -28,7 +28,7 @@ This repository stores the configuration files and documentation for running [Ki
 | Semantic search with Doubao embeddings | ❌ Returns empty results | ✅ Query-instruction prefix applied only to queries |
 | `/compact` on large sessions | ❌ Appears frozen with no progress | ✅ Live chunking progress shown |
 | `/settings` slash command | ❌ Crashes with context errors | ✅ Uses correct TUI contexts |
-| Over-indexing data/model files | ❌ Stuck at 1% on generated JSONs | ✅ Project `.kilocodeignore` keeps code/docs/config only |
+| Over-indexing data/model files | ❌ Stuck at 1% on generated JSONs | ✅ `.kilocodeignore` + source patch prune ignored dirs during glob traversal |
 | Ability to apply your own fixes | ❌ Black-box binary | ✅ Full TypeScript source in `kilo-source/` |
 
 ### Quick Build
