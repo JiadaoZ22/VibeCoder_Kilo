@@ -1505,3 +1505,106 @@ In the TUI run `/indexing`. With the directory pruning fix, the file count shoul
 
 ### Date
 2026-06-25
+---
+
+## Update: Compaction Regression After Live-Progress Fix
+
+### Timestamp
+- Issue introduced: 2026-06-22 22:11:30 CST (commit `0c4abb0`)
+- Observed / reproduced: 2026-06-25 16:54:14 CST
+- Diagnosed: 2026-06-25 ~16:54–17:03 CST
+- Source fix applied and validated: 2026-06-25 17:03:40 CST
+
+### Problem
+After the 2026-06-22 compaction fix, `/compact` on large sessions became extremely slow. The progress message showed a low chunk count for a long time, e.g.:
+
+```text
+Compacting session summary... (2/69 chunks summarized)
+```
+
+Code indexing also appeared stuck at `0% (1/237 files)` for an extended period.
+
+### Root Cause
+Commit `0c4abb0` added live progress reporting to chunked compaction. To update the progress text after every chunk, the developer replaced the previous concurrent `Effect.forEach(..., { concurrency: 3 })` with a serial `for` loop:
+
+```ts
+// Before
+const partial = yield* Effect.forEach(
+  chunks,
+  (chunk) => summarize({ ...input, chunk, total: chunks.length }),
+  { concurrency: Math.min(CONCURRENCY, chunks.length) },
+)
+
+// After (regression)
+const partial: Output[] = []
+for (let i = 0; i < chunks.length; i++) {
+  const result = yield* summarize({ ...input, chunk: chunks[i]!, total: chunks.length })
+  partial.push(result)
+  if (result.result !== "continue" || !result.output) {
+    return "compact" as const
+  }
+  yield* input.updatePart({ ... progress text ... })
+}
+```
+
+The `CONCURRENCY = 3` constant remained in the file but was no longer used. With 69 chunks, compaction now ran sequentially instead of three-at-a-time, making it roughly 3× slower and causing the UI to freeze visually whenever a single LLM call was slow.
+
+### Fix Applied
+File: `kilo-source/packages/opencode/src/kilocode/session/compaction-chunks.ts`
+
+Restored concurrent execution in fixed batches of `CONCURRENCY` while preserving ordered progress updates and early-exit behavior:
+
+```ts
+const partial: Output[] = []
+for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+  const batch = chunks.slice(i, i + CONCURRENCY)
+  const results = yield* Effect.forEach(
+    batch,
+    (chunk) => summarize({ ...input, chunk, total: chunks.length }),
+    { concurrency: batch.length },
+  )
+  partial.push(...results)
+  if (results.some((result) => result.result !== "continue" || !result.output)) {
+    return "compact" as const
+  }
+  yield* input.updatePart({
+    id: progressPartID,
+    messageID: input.target.id,
+    sessionID: input.sessionID,
+    type: "text",
+    text: `Compacting session summary... (${Math.min(i + CONCURRENCY, chunks.length)}/${chunks.length} chunks summarized)`,
+  })
+}
+```
+
+### Validation
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode
+PATH="$HOME/.bun/bin:$PATH" bun run typecheck
+# Result: clean
+```
+
+### Why Indexing Still Looks Slow
+Same commit `0c4abb0` also capped OpenAI-compatible embedding requests at 10 inputs (`OPENAI_COMPATIBLE_MAX_BATCH_INPUTS = 10`) because Ark/VolcanoEngine/Doubao rejects larger batches. The scanner still accumulates up to 60 blocks per batch, so each batch is split into 6 sequential 10-input HTTP requests. Additional overhead:
+
+- Every glob result is `stat()`'d defensively.
+- Each modified-file batch deletes old vectors before embedding.
+- Qdrant upserts use `wait: true`.
+- Progress only advances after a full batch finishes.
+
+This is expected behavior with Ark embeddings, not a deadlock. The counter will move once the first batch completes.
+
+### Build & Install
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo /tmp/kilo.new
+chmod +x /tmp/kilo.new
+mv -f /tmp/kilo.new ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+
+kilo --version
+```
+
+### Date
+2026-06-25

@@ -258,3 +258,79 @@ Start Kilo and type `/settings`. The Settings dialog should open normally.
 
 ## Date
 2026-06-22
+---
+
+# Fix: Compaction Extremely Slow / Stuck at Low Chunk Count After Progress Update
+
+## Problem
+After the compaction progress update, `/compact` on large sessions is extremely slow and the progress counter appears frozen at a low number (e.g., `Compacting session summary... (2/69 chunks summarized)`). Code indexing also advances very slowly and stays at `0%` for a long time.
+
+## Timestamps
+- Issue introduced: 2026-06-22 22:11:30 CST (commit `0c4abb0`)
+- Observed / reproduced: 2026-06-25 16:54:14 CST (from UI screenshot)
+- Diagnosed: 2026-06-25 16:54–17:03 CST
+- Source fix applied: 2026-06-25 17:03:40 CST
+- Validation (`bun run typecheck` in `packages/opencode`): 2026-06-25 17:03:40 CST
+
+## Root Cause
+Commit `0c4abb0` ("fix: Doubao embedding query prefix, /compact progress, /settings crash, and IDX batch size") replaced the previous concurrent chunk summarization:
+
+```ts
+Effect.forEach(chunks, summarize, { concurrency: Math.min(CONCURRENCY, chunks.length) })
+```
+
+with a serial `for` loop so it could update progress after each chunk. The `CONCURRENCY = 3` constant was left declared but unused. With 69 chunks, summarization now runs sequentially, so the UI advances one chunk at a time and appears stuck whenever a single LLM call is slow.
+
+## Solution Applied
+Restored concurrent processing in fixed batches of `CONCURRENCY` (3) while keeping ordered progress updates after each batch.
+
+### Files changed
+| File | Change |
+|---|---|
+| `kilo-source/packages/opencode/src/kilocode/session/compaction-chunks.ts` | Process chunks in batches of `CONCURRENCY`; update progress after each batch completes |
+
+### Code diff (summary)
+```ts
+const partial: Output[] = []
+for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+  const batch = chunks.slice(i, i + CONCURRENCY)
+  const results = yield* Effect.forEach(
+    batch,
+    (chunk) => summarize({ ...input, chunk, total: chunks.length }),
+    { concurrency: batch.length },
+  )
+  partial.push(...results)
+  if (results.some((result) => result.result !== "continue" || !result.output)) {
+    return "compact" as const
+  }
+  yield* input.updatePart({ ... progress text ... })
+}
+```
+
+### Validation
+- `bun run typecheck` in `packages/opencode`: clean
+
+## Related: Code Indexing Stays at 0% / Very Slow
+Same commit `0c4abb0` capped OpenAI-compatible embedding requests at 10 inputs (`OPENAI_COMPATIBLE_MAX_BATCH_INPUTS = 10`) because Ark/VolcanoEngine/Doubao rejects larger batches. The scanner still accumulates up to `BATCH_SEGMENT_THRESHOLD = 60` blocks per batch, so each batch is split into 6 sequential 10-input HTTP requests inside `OpenAICompatibleEmbedder.createEmbeddings()`. Other slow paths:
+
+- Defensive `stat()` on every glob result before extension filtering.
+- Delete-before-upsert for modified files in each batch.
+- Qdrant upserts use `wait: true`.
+- Progress only advances after a full batch finishes.
+
+This is expected behavior when using Ark embeddings; it is not a deadlock. The counter will move as soon as the first batch completes.
+
+## Build & Install
+```bash
+cd /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source
+PATH="$HOME/.bun/bin:$PATH" bun run --cwd packages/opencode script/build.ts --single --skip-install
+
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo /tmp/kilo.new
+chmod +x /tmp/kilo.new
+mv -f /tmp/kilo.new ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+
+kilo --version
+```
+
+### Date
+2026-06-25
