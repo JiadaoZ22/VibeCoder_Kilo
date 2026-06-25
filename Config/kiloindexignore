@@ -1,0 +1,127 @@
+# Global indexing-only ignore patterns for Kilo IDX.
+# Copy this file to ~/.kilocode/.kiloindexignore on any machine where you run Kilo.
+# It excludes data/model/binary files and common output directories from indexing
+# while leaving them accessible to agent tools when explicitly targeted.
+
+# === Common data / output directories (type-based, not project-specific) ===
+Data/
+data/
+data_roots/
+datasets/
+checkpoints/
+weights/
+runs/
+logs/
+
+# === Medical / neuroimaging ===
+*.nii
+*.nii.gz
+*.mgz
+*.mgh
+*.mgh.gz
+*.img
+*.hdr
+*.dcm
+*.dicom
+*.nrrd
+*.nhdr
+*.mha
+*.mhd
+*.vtk
+*.vti
+*.fib
+*.trk
+*.tck
+*.gii
+*.gii.gz
+*.annot
+*.label
+*.surface
+*.stl
+*.obj
+*.ply
+*.srf
+*.inflated
+*.sphere
+*.white
+*.pial
+*.curv
+*.sulc
+*.thickness
+*.area
+*.bvals
+*.bvecs
+
+# === Model weights / serialized tensors ===
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.joblib
+
+# === Python data formats ===
+*.feather
+*.orc
+*.dta
+*.sas7bdat
+*.xpt
+*.db
+*.sqlite
+*.sqlite3
+*.msgpack
+*.bcolz
+*.zarr
+*.tfrecord
+*.lmdb
+*.mdb
+*.leveldb
+
+# === R data formats ===
+*.rds
+*.rda
+*.RData
+*.rdata
+*.qs
+*.fst
+*.sav
+*.por
+*.rdb
+*.rdx
+
+# === Tabular / serialized data ===
+*.parquet
+*.csv
+*.tsv
+*.jsonl
+
+# === Binary media / archives / documents ===
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+*.ico
+*.pdf
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+
+# === Tool caches / environments ===
+node_modules/
+__pycache__/
+.venv*/
+.venv.*/
+.cache/
+.parcel-cache/
+*.egg-info/

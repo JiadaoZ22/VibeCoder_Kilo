@@ -82,6 +82,13 @@ If your workspace contains large experimental outputs (e.g. FreeSurfer `data_roo
 
 The best place for data-type filtering is the global indexing-only ignore file. It applies to every workspace, does **not** restrict agent tool access, and follows file types rather than fragile folder paths.
 
+A ready-to-use template is included in this repo:
+
+```bash
+mkdir -p ~/.kilocode
+cp /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/Config/kiloindexignore ~/.kilocode/.kiloindexignore
+```
+
 Create or edit `~/.kilocode/.kiloindexignore`:
 
 ```text

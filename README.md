@@ -10,6 +10,7 @@ This repository stores the configuration files and documentation for running [Ki
 |------|---------|
 | `Config/opencode.json` | Kilo main configuration (models, provider, MCP servers) |
 | `Config/auth.json` | API-key storage template for OpenRouter & Ark |
+| `Config/kiloindexignore` | Template for `~/.kilocode/.kiloindexignore` (global IDX data-type ignores) |
 | `Config/ReadMe.md` | Detailed setup & troubleshooting guide |
 
 ---
