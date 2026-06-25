@@ -1,6 +1,14 @@
 {
   "$schema": "https://app.kilo.ai/config.json",
   "model": "ark/ark-code-latest",
+  "agents": {
+    "compaction": {
+      "model": "ark/doubao-seed-2.0-mini",
+      "options": {
+        "reasoningEffort": "minimal"
+      }
+    }
+  },
   "indexing": {
     "enabled": true,
     "provider": "openai-compatible",
@@ -57,6 +65,9 @@
         },
         "doubao-seed-2.0-lite": {
           "name": "Doubao Seed 2.0 Lite"
+        },
+        "doubao-seed-2.0-mini": {
+          "name": "Doubao Seed 2.0 Mini"
         },
         "doubao-seed-code": {
           "name": "Doubao Seed Code"

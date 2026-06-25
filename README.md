@@ -30,6 +30,9 @@ This repository stores the configuration files and documentation for running [Ki
 | `/compact` on large sessions | ❌ Appears frozen with no progress | ✅ Live chunking progress shown |
 | `/settings` slash command | ❌ Crashes with context errors | ✅ Uses correct TUI contexts |
 | Over-indexing data/model files | ❌ Stuck at 1% on generated JSONs | ✅ `.kilocodeignore` + source patch prune ignored dirs during glob traversal |
+| Indexing throughput | ❌ Embedder split 60-input batches into 6 serial 10-input calls | ✅ Embedder-aware batch sizing (`maxBatchInputs`) |
+| File-system overhead during scan | ❌ `stat()` on every path including ignored files | ✅ Extension/ignore filtering before `stat()` |
+| Compaction chunk reduce | ❌ Recursive reduce ran sequentially | ✅ Concurrent reduce (up to 3) |
 | Ability to apply your own fixes | ❌ Black-box binary | ✅ Full TypeScript source in `kilo-source/` |
 
 ### Quick Build
@@ -63,7 +66,7 @@ kilo --version
 >
 > **Note:** The version string shown by `kilo --version` is generated from the **last git commit timestamp** on the current branch, not the build time. Don't be surprised if it shows an earlier date than when you built it.
 
-For the full technical breakdown of the patches, see [`Bugs/IDX/a_Solution.md`](Bugs/IDX/a_Solution.md).
+For the full technical breakdown of the indexing patches, see [`Bugs/Indexing/a_Solution.md`](Bugs/Indexing/a_Solution.md). For compaction tuning, see [`Bugs/Compaction/a_Solution.md`](Bugs/Compaction/a_Solution.md).
 
 ---
 
@@ -172,7 +175,7 @@ All configured models are OpenAI-compatible endpoints served through Ark:
 
 **Language models**
 - `ark-code-latest` (Auto-routing)
-- `doubao-seed-2.0-code` / `pro` / `lite`
+- `doubao-seed-2.0-code` / `pro` / `lite` / `mini`
 - `doubao-seed-code`
 - `doubao-seed-evolving` (Coding & Agent, weekly upgrade — [Volcano Ark docs](https://www.volcengine.com/docs/82379))
 - `minimax-latest`
@@ -209,6 +212,21 @@ Use **`/compact`** (or **`/summarize`**) regularly to condense conversation hist
 ```text
 /compact preserve the database schema decisions and auth flow
 ```
+
+**Use a dedicated lightweight compaction model:** By default Kilo falls back to your chat model (e.g., `ark-code-latest`) for compaction summaries. The bundled `Config/opencode.json` now pins compaction to `ark/doubao-seed-2.0-mini` with thinking disabled (`reasoningEffort: minimal`), which is smaller, faster, and cheaper than the chat model. If you copy the config template, this is already set; otherwise add it manually:
+
+```json
+"agents": {
+  "compaction": {
+    "model": "ark/doubao-seed-2.0-mini",
+    "options": {
+      "reasoningEffort": "minimal"
+    }
+  }
+}
+```
+
+> **Do not use `doubao-embedding-vision` for compaction** — it is an embedding model that outputs vectors, not text summaries.
 
 ### 2. Optional: Enable Vector-Search MCP (Codebase RAG)
 
