@@ -95,9 +95,44 @@ weights/
 runs/
 logs/
 
-# === Medical imaging ===
+# === Medical / neuroimaging ===
 *.nii
 *.nii.gz
+*.mgz
+*.mgh
+*.mgh.gz
+*.img
+*.hdr
+*.dcm
+*.dicom
+*.nrrd
+*.nhdr
+*.mha
+*.mhd
+*.vtk
+*.vti
+*.fib
+*.trk
+*.tck
+*.gii
+*.gii.gz
+*.annot
+*.label
+*.surface
+*.stl
+*.obj
+*.ply
+*.srf
+*.inflated
+*.sphere
+*.white
+*.pial
+*.curv
+*.sulc
+*.thickness
+*.area
+*.bvals
+*.bvecs
 
 # === Model weights / serialized tensors ===
 *.pth
@@ -113,6 +148,35 @@ logs/
 *.pkl
 *.pickle
 *.joblib
+
+# === Python data formats ===
+*.feather
+*.orc
+*.dta
+*.sas7bdat
+*.xpt
+*.db
+*.sqlite
+*.sqlite3
+*.msgpack
+*.bcolz
+*.zarr
+*.tfrecord
+*.lmdb
+*.mdb
+*.leveldb
+
+# === R data formats ===
+*.rds
+*.rda
+*.RData
+*.rdata
+*.qs
+*.fst
+*.sav
+*.por
+*.rdb
+*.rdx
 
 # === Tabular / serialized data ===
 *.parquet
