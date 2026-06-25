@@ -68,7 +68,94 @@ Use `/api/plan/v3` for embeddings when using a Coding Plan exclusive API key. A 
 
 If your workspace contains large experimental outputs (e.g. FreeSurfer `data_roots`, training logs, model checkpoints), exclude them from indexing. Otherwise the indexer will waste time and API quota on thousands of small data JSON files and appear stuck at a low percentage.
 
-Add a `watcher.ignore` block to your Kilo config (global or project-level `.kilo/kilo.json`):
+> **Important:** Kilo uses **two separate** ignore mechanisms:
+>
+> | Mechanism | What it controls | Where to put it |
+> |---|---|---|
+> | `watcher.ignore` in Kilo config | The `@parcel/watcher` file watcher (CPU/filesystem events) | `~/.config/kilo/opencode.json` or `.kilo/kilo.json` |
+> | `.kilocodeignore` / `.gitignore` | The IDX scanner (what gets embedded) | Workspace root (`<project>/.kilocodeignore`) |
+> | `~/.kilocode/.kiloindexignore` | IDX-only exclusions, machine-wide | `~/.kilocode/.kiloindexignore` |
+>
+> `watcher.ignore` does **not** prevent files from being embedded. To stop IDX from indexing data/model files, add them to `.kilocodeignore` (project-level) or `~/.kilocode/.kiloindexignore` (global).
+
+#### Project-level `.kilocodeignore` (recommended)
+
+Create or edit `<your-project>/.kilocodeignore`. Example for a neuroimaging / ML project:
+
+```text
+# === Dependency / package / tool caches ===
+node_modules/
+.pnpm/
+.yarn/
+.venv*/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.egg-info/
+dist/
+build/
+.cache/
+
+# === Editor / agent metadata ===
+.kilo/
+.kilocode/
+.vscode/
+.idea/
+.zed/
+
+# === Logs and runtime outputs ===
+0_Logs/
+logs/
+*.log
+
+# === Generated data / model / binary artifacts ===
+Data/
+data_roots/
+datasets/
+models/
+checkpoints/
+weights/
+runs/*/data_roots/
+
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.joblib
+*.parquet
+*.csv
+*.tsv
+*.nii
+*.nii.gz
+
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+*.ico
+*.pdf
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+```
+
+This keeps **code scripts, text documents, and project config files** in the index while skipping data/model binaries.
+
+#### Optional: also reduce watcher load
+
+Add a `watcher.ignore` block to your Kilo config so the file watcher does not watch the same directories:
 
 ```json
 {
@@ -100,7 +187,7 @@ Add a `watcher.ignore` block to your Kilo config (global or project-level `.kilo
 }
 ```
 
-After editing the config, **restart Kilo** and clear the old index if it was already stuck:
+After editing the ignore files, **clear the old index and restart Kilo**:
 
 ```bash
 rm -rf ~/.local/state/kilo/indexing

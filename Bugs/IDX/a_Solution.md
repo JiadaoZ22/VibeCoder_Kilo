@@ -1282,3 +1282,133 @@ Start Kilo and type `/settings`. The Settings dialog should open without crashin
 
 ### Date
 2026-06-22
+
+---
+
+## Update: IDX Stuck at 1% Scanning `fs_thickness.json` Data Files
+
+### Issue Observed
+
+Indexing progress stuck at a very low percentage, e.g.:
+
+```text
+Code Indexing • 1% (10/1140 files)
+Current: fs_thickness.json
+```
+
+The workspace contained **36,652** files, including **1,736** `fs_thickness.json` files under `2_QuickStart/**/runs/**/data_roots/**` plus many other generated data/model artifacts. IDX was trying to parse and embed every one of these small data JSON files, saturating the embedding API quota and making progress crawl.
+
+### Root Cause
+
+Kilo's indexer loads workspace `.gitignore` and `.kilocodeignore`, but the project's `.kilocodeignore` only excluded a few broad directories (`Data/`, `.venv*`, etc.). It did **not** exclude:
+
+- `2_QuickStart/**/runs/**/data_roots/**`
+- `0_Logs/**`
+- `.kilo/**`
+- model checkpoint extensions (`*.pth`, `*.ckpt`, `*.safetensors`, ...)
+- other generated binary/data files
+
+The hardcoded `FileIgnore` list inside `kilo-indexing` covers common build/vendor folders but not project-specific experimental outputs. As a result, the scanner discovered thousands of data files and appeared stuck while embedding them.
+
+### Fix Applied
+
+Updated the workspace `.kilocodeignore` to keep **code scripts, text documents, and project config files** while excluding generated data/model/binary artifacts.
+
+File: `<workspace>/.kilocodeignore`
+
+```text
+# === Dependency / package / tool caches ===
+node_modules/
+.pnpm/
+.yarn/
+.venv*/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.egg-info/
+dist/
+build/
+.next/
+.nuxt/
+.vite/
+.turbo/
+.cache/
+.parcel-cache/
+
+# === Editor / agent metadata ===
+.kilo/
+.kilocode/
+.kiloindex/
+.vscode/
+.idea/
+.zed/
+
+# === Logs and runtime outputs ===
+0_Logs/
+logs/
+*.log
+
+# === Generated data / model / binary artifacts ===
+Data/
+data_roots/
+datasets/
+models/
+checkpoints/
+weights/
+runs/*/data_roots/
+
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.joblib
+*.parquet
+*.csv
+*.tsv
+*.nii
+*.nii.gz
+
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+*.ico
+*.pdf
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+```
+
+Also updated `Config/ReadMe.md` to clarify that `watcher.ignore` only affects the file watcher; the IDX scanner is controlled by `.kilocodeignore` (workspace) and `~/.kilocode/.kiloindexignore` (global indexing-only).
+
+### Cleanup and Restart
+
+Because the existing LanceDB index already contained partial/stuck data for this workspace, the local index was cleared:
+
+```bash
+rm -rf ~/.local/state/kilo/indexing/lancedb
+```
+
+Then restart Kilo and run `/indexing`. With the new `.kilocodeignore`, the file count should drop dramatically (from tens of thousands to the actual code/doc/config set) and indexing should proceed at normal speed.
+
+### Why This Is Safe
+
+- `.kilocodeignore` only affects what IDX embeds. The agent can still read or edit excluded files when explicitly asked.
+- Project config JSONs, source code, Markdown docs, and other text files remain indexed because they are not matched by the ignore patterns.
+- `data_roots/` and `runs/*/data_roots/` patterns catch the FreeSurfer-generated JSONs that caused the stall.
+
+### Date
+2026-06-25
