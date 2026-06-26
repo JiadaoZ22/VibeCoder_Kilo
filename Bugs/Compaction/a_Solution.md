@@ -20,7 +20,7 @@ Added `doubao-seed-2.0-mini` to the Ark provider model list and configured the `
 {
   "$schema": "https://app.kilo.ai/config.json",
   "model": "ark/ark-code-latest",
-  "agents": {
+  "agent": {
     "compaction": {
       "model": "ark/doubao-seed-2.0-mini",
       "options": {
@@ -77,7 +77,7 @@ const model = agent.model
   : yield* provider.getModel(userMessage.model.providerID, userMessage.model.modelID)
 ```
 
-Because `agents.compaction.model` is now set, compaction will use `ark/doubao-seed-2.0-mini` instead of falling back to the session model.
+Because `agent.compaction.model` is now set, compaction will use `ark/doubao-seed-2.0-mini` instead of falling back to the session model.
 
 The agent options are merged into the final provider request in `packages/opencode/src/session/llm.ts`:
 

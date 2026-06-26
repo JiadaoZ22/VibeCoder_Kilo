@@ -216,7 +216,7 @@ Use **`/compact`** (or **`/summarize`**) regularly to condense conversation hist
 **Use a dedicated lightweight compaction model:** By default Kilo falls back to your chat model (e.g., `ark-code-latest`) for compaction summaries. The bundled `Config/opencode.json` now pins compaction to `ark/doubao-seed-2.0-mini` with thinking disabled (`reasoningEffort: minimal`), which is smaller, faster, and cheaper than the chat model. If you copy the config template, this is already set; otherwise add it manually:
 
 ```json
-"agents": {
+"agent": {
   "compaction": {
     "model": "ark/doubao-seed-2.0-mini",
     "options": {
