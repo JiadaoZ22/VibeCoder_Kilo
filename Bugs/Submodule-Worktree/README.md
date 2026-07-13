@@ -1,7 +1,7 @@
 # Kilo Submodule Worktree Fix
 
 **Bug:** Kilo CLI corrupts the `worktree` path for Git submodules in its SQLite database on every TUI startup, making session history appear lost.  
-**Affected:** Kilo ≤ 7.3.1 (and likely later until patched upstream).  
+**Affected:** Kilo ≤ 7.4.5 (verified up to 7.3.1; not re-tested on newer releases).  
 **Scope:** Any Git repo where `.git` is a file pointing to a parent `.git/modules/` directory.
 
 ---

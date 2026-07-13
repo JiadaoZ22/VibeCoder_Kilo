@@ -1,5 +1,8 @@
 # VibeCoder Kilo — Kilo Code CLI Configuration
 
+> **Current binary:** Kilo Code `public-7.4.5_private-0.0.0` (built from upstream Kilo `v7.4.5` merged into the local `fix/qdrant-check-compatibility` fork).  
+> **Last updated:** 2026-07-13.
+
 This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟 — 专属 API Key)** provider and optional **vector-search MCP** for intelligent code retrieval.
 
 ---
@@ -18,6 +21,8 @@ This repository stores the configuration files and documentation for running [Ki
 ## Build from Source (Recommended)
 
 > **The stock `npm install -g @kilocode/cli` package contains known upstream bugs** — most notably the Qdrant "Failed to obtain server version" warning on every startup, plus several indexing (IDX) reliability issues. To get a clean, bug-free experience, **build and install your own binary from the patched source** included in this repository.
+
+The patched source is pinned to upstream **Kilo `v7.4.5`** plus local fixes for Ark/Doubao embeddings and Qdrant/IDX stability.
 
 ### Why Build Yourself?
 

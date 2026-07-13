@@ -1,7 +1,7 @@
 # Bug Report: Kilo CLI loses sessions for Git submodules
 
 **Product:** Kilo Code CLI  
-**Version:** 7.3.0 (confirmed still present in 7.3.1)  
+**Version:** 7.3.0 (confirmed still present in 7.3.1; not re-tested on 7.4.5)  
 **Platform:** Linux x64 (musl)  
 **Date:** 2026-05-18 (last verified 2026-05-21)
 

@@ -1,6 +1,6 @@
 # Kilo Code
 
-> **Fixed binary installed** — if you see a Qdrant compatibility warning, see [`Bugs/IDX/a_Solution.md`](../Bugs/IDX/a_Solution.md) for the patch details.
+> **Fixed binary installed** — if you see a Qdrant compatibility warning, see [`Bugs/Indexing/a_Solution.md`](../Bugs/Indexing/a_Solution.md) for the patch details.
 
 ## Set Up Kilo Code CLI
 > Refer https://kilo.ai/docs/code-with-ai/platforms/cli
