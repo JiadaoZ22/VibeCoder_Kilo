@@ -251,7 +251,34 @@ npm install -g @modelcontextprotocol/server-vector-search
 
 After indexing, ask questions in natural language and Kilo auto-retrieves relevant context. See [`Config/ReadMe.md`](Config/ReadMe.md) for the full configuration snippet.
 
-### 3. Session Hygiene — Don't Let Sessions Grow Forever
+### 3. Optional: Enable Project Memory (Kilo v7.4.5+)
+
+**Memory is not the same as IDX.** IDX searches your codebase; Memory remembers facts, preferences, and session summaries across conversations.
+
+|  | IDX / vector search | Project Memory (`/memory`) |
+|---|---|---|
+| **Stores** | Code files and chunks from the repo. | Facts, corrections, conventions, and session digests. |
+| **Populated by** | Scanning/indexing the codebase (`/indexing`, MCP vector-search). | Explicit saves or automatic turn/session consolidation. |
+| **Used for** | Finding relevant code when you ask a question. | Giving the agent persistent project/user context. |
+| **Example** | “How does auth work?” → returns `auth.ts` snippets. | “We use 2-space indentation” → applied in future sessions. |
+
+**Enable project memory:**
+```text
+> /memory on
+```
+
+**Common commands:**
+```text
+> /memory remember we deploy to Vercel and use pnpm
+> /memory correct always use single quotes in TypeScript
+> /memory forget Vercel
+> /memory status
+> /memory auto on     # auto-save extracted facts after each turn
+```
+
+Memory files live inside the project (or workspace) and are editable. They are injected into the system prompt, so the agent starts new sessions already knowing the important details. Use memory for **decisions, conventions, and cross-session context**; use IDX for **finding code**.
+
+### 4. Session Hygiene — Don't Let Sessions Grow Forever
 
 | Pattern | Command | When to use |
 |---------|---------|-------------|
@@ -262,7 +289,7 @@ After indexing, ask questions in natural language and Kilo auto-retrieves releva
 
 **Rule of thumb:** If you're switching from "fix auth bug" to "refactor CSS," start a new session.
 
-### 4. Pick Models With Larger Context Windows
+### 5. Pick Models With Larger Context Windows
 
 Switch to a high-capacity model before long-haul tasks:
 
@@ -274,7 +301,7 @@ Switch to a high-capacity model before long-haul tasks:
 
 Switch anytime with `> /models`.
 
-### 5. Prevent Context Pollution
+### 6. Prevent Context Pollution
 
 - **Don't paste entire stack traces** — summarize the key error.
 - **Don't ask Kilo to "read all files in src/"** — ask specific questions so RAG finds the right files.
