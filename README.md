@@ -1,7 +1,8 @@
 # VibeCoder Kilo — Kilo Code CLI Configuration
 
 > **Current binary:** Kilo Code `public-7.4.5_private-0.0.0` (built from upstream Kilo `v7.4.5` merged into the local `fix/qdrant-check-compatibility` fork).  
-> **Last updated:** 2026-07-13.
+> **Last updated:** 2026-07-13.  
+> **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.
 
 This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟 — 专属 API Key)** provider and optional **vector-search MCP** for intelligent code retrieval.
 
@@ -207,6 +208,8 @@ As sessions grow, context-window exhaustion causes slower responses, truncated o
 ### 1. Proactive Compaction (Primary Defense)
 
 Use **`/compact`** (or **`/summarize`**) regularly to condense conversation history into a summary, preserving key decisions while dropping intermediate tool outputs.
+
+**Auto-compaction is also active by default.** Kilo monitors token usage after each response and automatically compacts when the conversation reaches `compaction.threshold_percent` or hits the reserved safety buffer. You can still run `/compact` manually if you want control over when it happens.
 
 **When to use it:**
 - After completing a major sub-task.
