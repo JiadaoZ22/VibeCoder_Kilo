@@ -64,6 +64,8 @@ For Kilo's built-in code indexing with Volcano Ark embeddings, add an `indexing`
 
 Use `/api/plan/v3` for embeddings when using a Coding Plan exclusive API key. A standard Ark API key may use `/api/v3`, but the configured exclusive key returns 401 there.
 
+> **Dimension note:** Kilo IDX uses `dimension: 2048` because direct testing against `/api/plan/v3/embeddings` confirmed `doubao-embedding-vision` returns 2048-dimensional vectors. The official Volcano Ark Agent Plan documentation shows `dimension: 1024` in the OpenViking example, but Kilo's verified setup uses 2048.
+
 ### Avoid Indexing Generated Data
 
 If your workspace contains large experimental outputs (e.g. FreeSurfer `data_roots`, training logs, model checkpoints), exclude them from indexing. Otherwise the indexer will waste time and API quota on thousands of small data JSON files and appear stuck at a low percentage.
