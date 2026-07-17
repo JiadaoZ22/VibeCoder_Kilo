@@ -1,7 +1,7 @@
 # VibeCoder Kilo — Kilo Code CLI Configuration
 
-> **Current binary:** Kilo Code `public-7.4.5_private-0.0.0` (built from upstream Kilo `v7.4.5` merged into the local `fix/qdrant-check-compatibility` fork).  
-> **Last updated:** 2026-07-13.  
+> **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202607170212` (built from upstream Kilo `v7.4.11` merged into the local `fix/qdrant-check-compatibility` fork).  
+> **Last updated:** 2026-07-17.  
 > **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.
 
 This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟 — 专属 API Key)** provider and optional **vector-search MCP** for intelligent code retrieval.
