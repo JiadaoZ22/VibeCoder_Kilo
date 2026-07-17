@@ -180,10 +180,11 @@ If you only want to rewind a few turns in the *current* chat, use `/undo` instea
 All configured models are OpenAI-compatible endpoints served through Ark:
 
 **Language models**
-- `ark-code-latest` (Auto-routing)
-- `doubao-seed-2.0-code` / `pro` / `lite` / `mini`
-- `doubao-seed-code`
-- `doubao-seed-evolving` (Coding & Agent, weekly upgrade — [Volcano Ark docs](https://www.volcengine.com/docs/82379))
+- `ark-code-latest` (Auto-routing, 128K context)
+- `doubao-seed-2.0-code` / `pro` / `lite` (128K context)
+- `doubao-seed-2.0-mini` (256K context — default compaction model)
+- `doubao-seed-code` (128K context)
+- `doubao-seed-evolving` (Coding & Agent, weekly upgrade, **1M context** — [Volcano Ark docs](https://www.volcengine.com/docs/82379))
 - `minimax-latest`
 - `glm-5.1`, `glm-4.7`
 - `deepseek-v4-pro`, `deepseek-v4-flash`

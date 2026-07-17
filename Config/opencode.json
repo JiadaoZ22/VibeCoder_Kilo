@@ -55,25 +55,32 @@
       },
       "models": {
         "ark-code-latest": {
-          "name": "Ark(VolcanoEngine) Auto: effect+speed"
+          "name": "Ark(VolcanoEngine) Auto: effect+speed",
+          "limit": { "context": 128000, "output": 16384 }
         },
         "doubao-seed-2.0-code": {
-          "name": "Doubao Seed 2.0 Code"
+          "name": "Doubao Seed 2.0 Code",
+          "limit": { "context": 128000, "output": 16384 }
         },
         "doubao-seed-2.0-pro": {
-          "name": "Doubao Seed 2.0 Pro"
+          "name": "Doubao Seed 2.0 Pro",
+          "limit": { "context": 128000, "output": 16384 }
         },
         "doubao-seed-2.0-lite": {
-          "name": "Doubao Seed 2.0 Lite"
+          "name": "Doubao Seed 2.0 Lite",
+          "limit": { "context": 128000, "output": 16384 }
         },
         "doubao-seed-2.0-mini": {
-          "name": "Doubao Seed 2.0 Mini"
+          "name": "Doubao Seed 2.0 Mini",
+          "limit": { "context": 256000, "output": 32768 }
         },
         "doubao-seed-code": {
-          "name": "Doubao Seed Code"
+          "name": "Doubao Seed Code",
+          "limit": { "context": 128000, "output": 16384 }
         },
         "doubao-seed-evolving": {
-          "name": "Doubao Seed Evolving (Coding & Agent, weekly upgrade)"
+          "name": "Doubao Seed Evolving (Coding & Agent, weekly upgrade)",
+          "limit": { "context": 1000000, "output": 32768 }
         },
         "minimax-latest": {
           "name": "MiniMax M2.7"
