@@ -1,6 +1,6 @@
 # VibeCoder Kilo — Kilo Code CLI Configuration
 
-> **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202607270050` (built from upstream Kilo `v7.4.16` merged into the local `fix/qdrant-check-compatibility` fork).  
+> **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202607270654` (built from upstream Kilo `v7.4.16` merged into the local `fix/qdrant-check-compatibility` fork).  
 > **Last updated:** 2026-07-27.  
 > **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.
 
@@ -23,7 +23,7 @@ This repository stores the configuration files and documentation for running [Ki
 
 > **The stock `npm install -g @kilocode/cli` package contains known upstream bugs** — most notably the Qdrant "Failed to obtain server version" warning on every startup, plus several indexing (IDX) reliability issues. To get a clean, bug-free experience, **build and install your own binary from the patched source** included in this repository.
 
-The patched source is pinned to upstream **Kilo `v7.4.5`** plus local fixes for Ark/Doubao embeddings and Qdrant/IDX stability.
+The patched source is pinned to upstream **Kilo `v7.4.16`** plus local fixes for Ark/Doubao embeddings and Qdrant/IDX stability.
 
 ### Why Build Yourself?
 

@@ -9,6 +9,9 @@
       }
     }
   },
+  "memory": {
+    "model": "ark/doubao-seed-2.0-mini"
+  },
   "indexing": {
     "enabled": true,
     "provider": "openai-compatible",
