@@ -83,7 +83,7 @@
         },
         "doubao-seed-evolving": {
           "name": "Doubao Seed Evolving (Coding & Agent, weekly upgrade)",
-          "limit": { "context": 1000000, "output": 32768 }
+          "limit": { "context": 1000000, "output": 131072 }
         },
         "minimax-latest": {
           "name": "MiniMax M2.7"
