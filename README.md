@@ -1,6 +1,6 @@
 # VibeCoder Kilo — Kilo Code CLI Configuration
 
-> **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202607280228` (built from upstream Kilo `v7.4.16` merged into the local `fix/qdrant-check-compatibility` fork).  
+> **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202607280237` (built from upstream Kilo `v7.4.16` merged into the local `fix/qdrant-check-compatibility` fork).  
 > **Last updated:** 2026-07-27.  
 > **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.
 
