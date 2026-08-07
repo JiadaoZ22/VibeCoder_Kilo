@@ -2,7 +2,8 @@
 
 > **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202607280237` (built from upstream Kilo `v7.4.16` merged into the local `fix/qdrant-check-compatibility` fork).  
 > **Last updated:** 2026-07-27.  
-> **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.
+> **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.  
+> **⚠️ Rebuild pending (2026-08-07):** `kilo-source` now contains a subagent-delegation prompt fix (`f0e4ba4d48`) that is **not in the binary above**. Rebuild to activate it — see [`Bugs/SubAgenting/a_Solution.md`](Bugs/SubAgenting/a_Solution.md).
 
 This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟 — 专属 API Key)** provider and optional **vector-search MCP** for intelligent code retrieval.
 

@@ -3,6 +3,13 @@
 ## Timestamp
 - Initial observation: **2026-08-07 17:45 CST**
 - Investigation completed: **2026-08-07 18:10 CST**
+- Root cause corrected and fix applied: **2026-08-07 20:45 CST**
+
+## Status
+**Resolved.** The fix is applied in `kilo-source` commit `f0e4ba4d48` and published on
+`JiadaoZ22/kilocode` branch `fix/qdrant-check-compatibility`. See `a_Solution.md`.
+
+A rebuild is still required before the running binary picks it up.
 
 ## Context
 
@@ -127,11 +134,49 @@ This directly regresses local commit `75805a2` — *"feat(code): bump submodule 
 subagent delegation prompt"* — which had been made specifically to pick up that guidance.
 Upstream removed it again on the next submodule bump.
 
+### 3a. The earlier local fix existed but targeted the wrong file
+
+Follow-up investigation found that the local fix behind `75805a2` **was never lost**. It lives on
+the tracked submodule branch as `249f4a71c1` — *"feat(code): encourage subagent delegation in code
+mode prompt"* — and adds exactly the needed directive:
+
+```
+- For complex, multi-step work, delegate to subagents with the task tool. Use `explore` for
+  codebase research, `general` for autonomous implementation or verification, and launch multiple
+  subagents in parallel when subtasks are independent. Do not duplicate work the subagent is doing.
+```
+
+But it was added to **`codex.txt` only**. Ark models resolve to **`default.txt`** (see §5), so the
+guidance never reached the models actually in use. Verified:
+
+| Branch file | Delegation guidance |
+|---|---|
+| `codex.txt` @ `fix/qdrant-check-compatibility` | present (`249f4a7`) |
+| `default.txt` @ same branch | **absent** — only the file-search line |
+
+This is the true root cause of the observed behaviour: not a missing fix, but a fix applied to a
+prompt profile that the configured provider never selects.
+
+### 3b. The build in use had also drifted off the tracked branch
+
+`.gitmodules` pins `branch = fix/qdrant-check-compatibility`, but the `kilo-source` worktree was
+checked out on `main`, which is a different lineage (diverged, ~1444 commits, not an
+ancestor-descendant pair). Consequences:
+
+- The **Qdrant fix was absent** from the working tree — `checkCompatibility: false` was missing
+  from `packages/kilo-indexing/src/indexing/vector-store/qdrant-client.ts`, i.e. the very bug this
+  fork exists to patch (see `README.md`) had silently regressed locally.
+- `main` was at package version `7.4.20` while the tracked branch was `7.4.16`, so local state no
+  longer matched what `README.md` documents.
+- The recorded gitlink `249f4a7` was not reachable from the checked-out branch, and the worktree
+  commit `0ac10df` was **not pushed to any remote**, so publishing that pointer would have broken
+  `git clone --recursive`.
+
 ### 4. What remains in each prompt is far too weak
 
 | Prompt | Delegation guidance | Strength |
 |---|---|---|
-| `codex.txt` | *(none — removed by `1f99fb2332`)* | **none** |
+| `codex.txt` | *(upstream removed it in `1f99fb2332`; local `249f4a7` restored it)* | **strong (local only)** |
 | `gpt.txt` | *(none — removed by `1f99fb2332`)* | **none** |
 | `default.txt:81` | "When doing file search, prefer to use the Task tool in order to reduce context usage." | file search only |
 | `trinity.txt:83` | same as default | file search only |
@@ -141,7 +186,8 @@ Upstream removed it again on the next submodule bump.
 | `orchestrator.txt` | entire prompt is delegation protocol | strongest |
 
 So automatic delegation from `code` is effectively **model-dependent**: it can work on Claude and
-GPT-5.5 prompt profiles, and essentially never fires on the profiles with no guidance at all.
+GPT-5.5 prompt profiles, and essentially never fires on the profiles with no guidance at all —
+which includes `default.txt`, the profile every generic OpenAI-compatible provider falls back to.
 
 ### 5. Why this session in particular never delegated
 
