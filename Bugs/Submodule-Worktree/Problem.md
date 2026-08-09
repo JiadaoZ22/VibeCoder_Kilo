@@ -46,7 +46,7 @@ In `~/.local/share/kilo/kilo.db`, the `project` table records:
 | project `id` | stored `worktree` | actual working directory | sandboxes |
 |---|---|---|---|
 | `a31cb1999225cec4110e6e56492c6ec396ab56f1` | `.../JDgentLAB/.git/modules` | `.../JDgentLAB/VibeCoder_Kilo` | `[".../VibeCoder_Kilo"]` |
-| `7983312a3bf2a821197f4cdd797662c9ed499fd7` | `.../JDgentLAB/.git/modules/2_KnowledgeBases` | `.../JDgentLAB/2_KnowledgeBases/MyResearchReading` | `[".../MyResearchReading"]` |
+| `7983312a3bf2a821197f4cdd797662c9ed499fd7` | `.../JDgentLAB/.git/modules/2_KnowledgeBase` | `.../JDgentLAB/2_KnowledgeBase/MyResearchReading` | `[".../MyResearchReading"]` |
 | `e7872c4a14c01060bfd2446cee1a4455cd25cdad` | `.../Zoujd_IMI/.git/modules/f1_Code/Brain` | `.../Zoujd_IMI/f1_Code/Brain/FreeSurfer` | `[".../FreeSurfer"]` |
 
 Pattern: Kilo appears to use `dirname(git-dir)` for submodules instead of `git rev-parse --show-toplevel`.
