@@ -57,16 +57,16 @@
         "baseURL": "https://ark.cn-beijing.volces.com/api/plan/v3"
       },
       "models": {
-        "ark-code-latest": {
+        "auto": {
           "name": "Ark(VolcanoEngine) Auto: effect+speed",
           "limit": { "context": 256000, "output": 131072 }
         },
-        "doubao-seed-2.0-code": {
-          "name": "Doubao Seed 2.0 Code",
-          "limit": { "context": 256000, "output": 131072 }
+        "doubao-seed-evolving": {
+          "name": "Doubao Seed Evolving (Coding & Agent, weekly upgrade)",
+          "limit": { "context": 1000000, "output": 262144 }
         },
-        "doubao-seed-2.0-pro": {
-          "name": "Doubao Seed 2.0 Pro",
+        "doubao-seed-2.1-turbo": {
+          "name": "Doubao Seed 2.1 Turbo",
           "limit": { "context": 256000, "output": 131072 }
         },
         "doubao-seed-2.0-lite": {
@@ -77,20 +77,12 @@
           "name": "Doubao Seed 2.0 Mini",
           "limit": { "context": 256000, "output": 131072 }
         },
-        "doubao-seed-code": {
-          "name": "Doubao Seed Code",
-          "limit": { "context": 256000, "output": 32768 }
-        },
-        "doubao-seed-evolving": {
-          "name": "Doubao Seed Evolving (Coding & Agent, weekly upgrade)",
-          "limit": { "context": 1000000, "output": 262144 }
-        },
-        "minimax-latest": {
-          "name": "MiniMax M2.7",
+        "minimax-m3": {
+          "name": "MiniMax M3",
           "limit": { "context": 200000, "output": 131072 }
         },
-        "glm-5.2": {
-          "name": "GLM 5.2",
+        "glm-5.3": {
+          "name": "GLM 5.3",
           "limit": { "context": 1000000, "output": 131072 }
         },
         "deepseek-v4-pro": {
@@ -104,6 +96,9 @@
         "kimi-k2.6": {
           "name": "Kimi K2.6",
           "limit": { "context": 256000, "output": 32768 }
+        },
+        "doubao-seedance-2.5": {
+          "name": "Doubao Seedance 2.5 (Vision)"
         },
         "doubao-seedance-2.0": {
           "name": "Doubao Seedance 2.0 (Vision)"
