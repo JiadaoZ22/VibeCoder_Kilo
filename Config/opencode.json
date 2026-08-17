@@ -57,7 +57,7 @@
         "baseURL": "https://ark.cn-beijing.volces.com/api/plan/v3"
       },
       "models": {
-        "auto": {
+        "ark-code-latest": {
           "name": "Ark(VolcanoEngine) Auto: effect+speed",
           "limit": { "context": 256000, "output": 131072 }
         },
