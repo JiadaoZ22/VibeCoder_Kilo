@@ -3,7 +3,8 @@
 > **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202607280237` (built from upstream Kilo `v7.4.16` merged into the local `fix/qdrant-check-compatibility` fork).  
 > **Last updated:** 2026-07-27.  
 > **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.  
-> **⚠️ Rebuild pending (2026-08-07):** `kilo-source` now contains a subagent-delegation prompt fix (`f0e4ba4d48`) that is **not in the binary above**. Rebuild to activate it — see [`Bugs/SubAgenting/a_Solution.md`](Bugs/SubAgenting/a_Solution.md).
+> **⚠️ Rebuild pending (2026-08-07):** `kilo-source` now contains a subagent-delegation prompt fix (`f0e4ba4d48`) that is **not in the binary above**. Rebuild to activate it — see [`Bugs/SubAgenting/a_Solution.md`](Bugs/SubAgenting/a_Solution.md).  
+> **🔒 Build policy:** New builds are stored as separate immutable artifacts; the working binary is never overwritten and old versions are deleted **only by hand** — see [Build Policy](#build-policy--never-overwrite-the-working-binary).
 
 This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟 — 专属 API Key)** provider and optional **vector-search MCP** for intelligent code retrieval.
 
@@ -42,36 +43,139 @@ The patched source is pinned to upstream **Kilo `v7.4.16`** plus local fixes for
 | Compaction chunk reduce | ❌ Recursive reduce ran sequentially | ✅ Concurrent reduce (up to 3) |
 | Ability to apply your own fixes | ❌ Black-box binary | ✅ Full TypeScript source in `kilo-source/` |
 
-### Quick Build
+### Build Policy — Never Overwrite the Working Binary
 
-This repo already includes the forked source as a submodule (`kilo-source/`).
+> **Rule (mandatory):** A build must **never** replace or destroy the binary you are currently using. Each build produces a **new, separately stored, immutable artifact**. Switching versions is a *pointer change*, not a file overwrite. **Old versions are deleted only when I explicitly delete them by hand** — no build step, no script, and no agent may prune them automatically.
+> **The latest build version's terminal wake-up command shall be "kilo" while the existing one shall be "kilo-<version>" for clarification.**
+
+#### Why this rule exists
+
+Building in place creates a class of confusion that is hard to debug:
+
+| Hazard | What actually happens |
+|---|---|
+| **In-place overwrite** | `cp … → bin/.kilo` destroys the known-good binary. If the new build is broken, there is nothing to fall back to. |
+| **Live symlink into `dist/`** | On this machine `~/.npm-global/bin/kilo` is a symlink **directly into the build tree** (`kilo-source/packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo`). Any rebuild silently mutates the "installed" CLI — even a *failed* or half-written build. |
+| **Rebuild while Kilo is running** | The running process keeps the old inode while new invocations get the new binary → two different versions live at once, with mismatched DB/session expectations. |
+| **Ambiguous version string** | `kilo --version` derives from the **last git commit timestamp**, not build time, so an overwritten binary can *look* unchanged after a successful rebuild. |
+| **Unclear provenance** | Without one artifact per build you cannot answer "which commit is this binary?" months later. |
+
+#### Layout
+
+```text
+~/.npm-global/lib/node_modules/@kilocode/cli/bin/
+├── kilo                     # npm launcher shim (do not touch)
+├── .kilo -> versions/…      # ACTIVE binary — a symlink, never a real file
+└── versions/
+    ├── kilo-7.4.16-a1b2c3d-20260727      # kept
+    ├── kilo-7.4.22-ccd56a5-20260817      # kept  (currently active)
+    └── kilo-7.4.22-f0e4ba4-20260818      # new build under test
+```
+
+Each artifact name encodes **upstream version + short commit + build date**, so provenance is self-documenting and no two builds can collide.
+
+#### Build a new version (existing one stays untouched)
 
 ```bash
-# 1. Initialize the submodule (if you haven't already)
-git submodule update --init --recursive
-
-# 2. Enter the source directory
 cd kilo-source
 
-# 3. Install dependencies (only needed once)
+# 0. First time only
+git submodule update --init --recursive
 bun install
 
-# 4. Build for your current platform only
-#    Use --skip-install after the first build to save time.
+# 1. Build into the source dist/ (scratch area — NOT the installed binary)
 bun run --cwd packages/opencode script/build.ts --single --skip-install
 
-# 5. Replace the system-installed binary
-#    (adjust path if your npm global prefix differs)
-cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo \
-   ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
+# 2. Name the artifact from real metadata
+BIN=~/.npm-global/lib/node_modules/@kilocode/cli/bin
+VER=$(node -p "require('./packages/opencode/package.json').version")
+SHA=$(git rev-parse --short HEAD)
+TAG="kilo-${VER}-${SHA}-$(date +%Y%m%d)"
 
-# 6. Verify
+# 3. Store it as a NEW immutable artifact
+mkdir -p "$BIN/versions"
+cp packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo "$BIN/versions/$TAG"
+chmod 555 "$BIN/versions/$TAG"          # read-only: cannot be clobbered later
+
+# 4. Smoke-test the NEW artifact WITHOUT activating it
+"$BIN/versions/$TAG" --version
+"$BIN/versions/$TAG" --help >/dev/null && echo "new build OK"
+```
+
+At this point the active CLI is **still the old, working version**. Nothing has been replaced.
+
+#### Activate the new version (atomic, reversible)
+
+```bash
+# Record what is currently active so you can always go back
+readlink -f "$BIN/.kilo" | tee ~/.kilo-active-previous
+
+# Atomic pointer swap (ln -sfn replaces the symlink in one syscall)
+ln -sfn "$BIN/versions/$TAG" "$BIN/.kilo"
+
 kilo --version
 ```
 
-> **Tip:** Keep the original binary as a backup: `cp ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo.backup`
->
-> **Note:** The version string shown by `kilo --version` is generated from the **last git commit timestamp** on the current branch, not the build time. Don't be surprised if it shows an earlier date than when you built it.
+> **Exit every running Kilo TUI before switching.** A live session pinned to the old inode plus new invocations on the new binary is the fastest way to corrupt session/DB expectations.
+
+#### Roll back
+
+```bash
+ln -sfn "$(cat ~/.kilo-active-previous)" "$BIN/.kilo"
+kilo --version
+```
+
+Rollback is instant because **the old artifact was never deleted**.
+
+#### One-time migration off the live-`dist/` symlink
+
+The current `~/.npm-global/bin/kilo` points straight into the build tree, which violates the rule above. Fix it once:
+
+```bash
+BIN=~/.npm-global/lib/node_modules/@kilocode/cli/bin
+mkdir -p "$BIN/versions"
+
+# Freeze the binary that works TODAY as a named artifact
+cp "$(readlink -f ~/.npm-global/bin/kilo)" \
+   "$BIN/versions/kilo-7.4.22-ccd56a5-20260817"
+chmod 555 "$BIN/versions/kilo-7.4.22-ccd56a5-20260817"
+
+# Point the launcher at the artifact store instead of dist/
+ln -sfn "$BIN/versions/kilo-7.4.22-ccd56a5-20260817" "$BIN/.kilo"
+ln -sfn "$BIN/kilo" ~/.npm-global/bin/kilo
+
+kilo --version
+```
+
+After this, `bun run … build.ts` only writes to `kilo-source/…/dist/`, which is **scratch space** — rebuilding can no longer affect the CLI you are using.
+
+#### Retention — manual deletion only
+
+```bash
+# Inspect what you have accumulated (each build is ~190–230 MB)
+ls -lh ~/.npm-global/lib/node_modules/@kilocode/cli/bin/versions/
+du -sh  ~/.npm-global/lib/node_modules/@kilocode/cli/bin/versions/
+
+# Delete ONLY when I decide to, and never the currently active one
+readlink -f ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo   # check first
+rm ~/.npm-global/lib/node_modules/@kilocode/cli/bin/versions/kilo-7.4.16-a1b2c3d-20260727
+```
+
+**Forbidden:** any automatic pruning — no `rm` inside build scripts, no "keep last N" cron job, no cleanup performed by a coding agent on its own initiative. Disk pressure is reported to me; it is not resolved by deleting builds.
+
+Legacy ad-hoc backups (`.kilo.backup`, `.kilo.prev`, `.kilo.before-compaction-fix`, `.kilo.before-efficiency-updates`, `.kilo.before-upstream-merge`) are the old, unstructured form of this same policy. Keep them until I retire them explicitly; new builds go into `versions/` instead.
+
+#### Testing a build without activating it at all
+
+```bash
+BIN=~/.npm-global/lib/node_modules/@kilocode/cli/bin
+alias kilo-next="$BIN/versions/kilo-7.4.22-f0e4ba4-20260818"
+kilo-next            # run the candidate; `kilo` remains the stable version
+```
+
+Prefer this for feature work: exercise the candidate in a scratch directory (e.g. `/tmp/kilo`) for a few sessions, then activate only once it has proven itself.
+
+> **Note:** The version string shown by `kilo --version` is generated from the **last git commit timestamp** on the current branch, not the build time. Don't rely on it to tell two builds apart — rely on the artifact filename, which carries the commit SHA.
 
 For the full technical breakdown of the indexing patches, see [`Bugs/Indexing/a_Solution.md`](Bugs/Indexing/a_Solution.md). For compaction tuning, see [`Bugs/Compaction/a_Solution.md`](Bugs/Compaction/a_Solution.md).
 
@@ -402,6 +506,14 @@ kilo session list
 - Resume a specific session by ID: **`kilo --session <session_id>`**
 - Start Kilo normally, then use `/timeline` to jump to a specific message in the current session.
 
+### `/remote` Requires a Kilo Account
+
+**Symptom:** `/remote` is visible in the TUI palette but disabled; selecting it shows `Kilo login required`. `kilo remote` fails with `Unable to enable remote: no Kilo credentials found.`
+
+**Root cause:** The remote session relay is a **Kilo-account** service. With only third-party credentials (`ark`, `openrouter`) in `auth.json`, `provider_next.connected` lacks `"kilo"`, so the command cannot be enabled.
+
+**Fix:** `kilo auth login` with the Kilo provider, then restart the TUI. Headless alternative: `export KILO_API_KEY=…; kilo remote`. Full analysis in [`Bugs/Remote-Command/Problem.md`](Bugs/Remote-Command/Problem.md); the TUI patch is documented in [`Bugs/Remote-Command/a_Solution.md`](Bugs/Remote-Command/a_Solution.md).
+
 ### Mouse Selection Does Not Copy to Clipboard
 
 **Symptom:** You select text inside Kilo's TUI with your mouse, but nothing ends up in the system clipboard.
@@ -437,9 +549,20 @@ kilo session list
 │   ├── opencode.json   # Kilo configuration (provider, models, MCP)
 │   ├── auth.json       # API-key template
 │   └── ReadMe.md       # Detailed setup guide
+├── Bugs/               # Per-issue reports and fixes
+│   ├── Compaction/
+│   ├── Indexing/
+│   ├── Remote-Command/ # /remote requires a Kilo account credential
+│   ├── SubAgenting/
+│   └── Submodule-Worktree/
+├── kilo-source/        # Patched Kilo source (submodule) — dist/ is SCRATCH space
 ├── README.md           # This file
 └── .gitignore
 ```
+
+> Built binaries do **not** live in this repo. They are stored as immutable artifacts under
+> `~/.npm-global/lib/node_modules/@kilocode/cli/bin/versions/`, with the active one selected by the
+> `.kilo` symlink. See [Build Policy](#build-policy--never-overwrite-the-working-binary).
 
 ### Configuration Tips
 
