@@ -60,12 +60,12 @@ EOF
 
 ## Step 4 — Install the skill into Kilo's skill paths
 
-Global (all projects), Kilo convention:
+Global (all projects), Kilo convention. **Config root decision (2026-08-19):** use `~/.config/kilo/` — shared with the `subagenting` plugin feature (`Update/20260819_Plugin/`), so all global Kilo customizations live under one root:
 
 ```bash
-mkdir -p ~/.kilocode/skills/evolve-setup
-cp /tmp/evolve-skill/evolve_skill/trae/SKILL.md ~/.kilocode/skills/evolve-setup/SKILL.md
-cp -R /tmp/evolve-skill/evolve_skill/shared ~/.kilocode/skills/evolve-setup/shared
+mkdir -p ~/.config/kilo/skills/evolve-setup
+cp /tmp/evolve-skill/evolve_skill/trae/SKILL.md ~/.config/kilo/skills/evolve-setup/SKILL.md
+cp -R /tmp/evolve-skill/evolve_skill/shared ~/.config/kilo/skills/evolve-setup/shared
 ```
 
 Adapt `SKILL.md` minimally for Kilo (record edits in this folder):
@@ -107,7 +107,7 @@ Then in the TUI:
 
 ## Rollback / Uninstall
 
-- Skill: `rm -rf ~/.kilocode/skills/evolve-setup`
+- Skill: `rm -rf ~/.config/kilo/skills/evolve-setup`
 - CLI: `rm -rf ~/.local/share/evolve-venv ~/.evolve ~/.evolve-skill.env` (remove the `source` line from `~/.bashrc`)
 - Applied proposals: delete `evolvor:chg_<id>` marker blocks, or `git checkout` the affected `AGENTS.md` (all target projects are git repos)
 

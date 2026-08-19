@@ -1,9 +1,10 @@
 # VibeCoder Kilo — Kilo Code CLI Configuration
 
-> **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202607280237` (built from upstream Kilo `v7.4.16` merged into the local `fix/qdrant-check-compatibility` fork).  
-> **Last updated:** 2026-07-27.  
+> **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202608190324` (built from upstream Kilo `v7.4.22` merged into the local `fix/qdrant-check-compatibility` fork).  
+> **Last updated:** 2026-08-19.  
+> **New (2026-08-19):** **"Agent-Voting" verification-scaling** — say the word `agent-voting` in any prompt (or `/agent-voting N rounds <task>`) to auto fan out N candidate subagents plus a read-only verifier that scores and selects. See [Agent-Voting](#agent-voting--one-word-verification-scaling) and [`Update/20260819_Plugin/`](Update/20260819_Plugin).  
+> **Fixed (2026-08-19):** mobile "not found" on `/remote` sessions — resumed sessions are now bootstrapped to the session relay on the first advertising heartbeat. See [`Bugs/Remote-Command/b_Mobile-NotFound-ResumedSession-Fix.md`](Bugs/Remote-Command/b_Mobile-NotFound-ResumedSession-Fix.md).  
 > **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.  
-> **⚠️ Rebuild pending (2026-08-07):** `kilo-source` now contains a subagent-delegation prompt fix (`f0e4ba4d48`) that is **not in the binary above**. Rebuild to activate it — see [`Bugs/SubAgenting/a_Solution.md`](Bugs/SubAgenting/a_Solution.md).  
 > **🔒 Build policy:** New builds are stored as separate immutable artifacts; the working binary is never overwritten and old versions are deleted **only by hand** — see [Build Policy](#build-policy--never-overwrite-the-working-binary).
 
 This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟 — 专属 API Key)** provider and optional **vector-search MCP** for intelligent code retrieval.
@@ -304,6 +305,34 @@ All configured models are OpenAI-compatible endpoints served through Ark:
 Switch models anytime inside Kilo with `/models`.
 
 See [`Config/ReadMe.md`](Config/ReadMe.md) for full parameters, troubleshooting, and tuning tips.
+
+---
+
+## Agent-Voting — One-Word Verification Scaling
+
+> **New 2026-08-19.** Full design, validation results, and rollback: [`Update/20260819_Plugin/`](Update/20260819_Plugin). (Renamed from "subagenting" same day — the old name read as generic parallel subagents; "agent-voting" says what it does: candidates compete, a verifier votes.)
+
+Say the word **`agent-voting`** in any prompt, in any project, and Kilo automatically switches from single-shot answering to **verification-scaled generation**: it fans out N independent candidate subagents on the same spec, then runs a **separate read-only verifier subagent** that scores every candidate per criterion, picks a winner, and reports concrete `file:line` discrepancies for a refine round. The empirical basis: a weak generator + a fine-grained verifier beats a strong generator sampled once.
+
+```text
+agent-voting: refactor the auth module to use sessions      # auto degree from task complexity
+agent-voting N=4 rounds=2: convert the ADNI dataset         # explicit degree, honoured verbatim
+/agent-voting 4 2 write the performance report              # slash-command form
+```
+- **Degree ladder** (tier 0–4): trivial typo fix → single pass + spot-check; multi-file work → N=3 + verifier + 1 refine round; publication-grade / high-stakes → N=4–5 + ensembled judge + re-verification. Explicit numbers always win.
+- **Generator ≠ approver**: the verifier subagent (`agent/verifier.md`) is permission-locked read-only (`edit`/`write`/`bash: deny`) — it judges, it can never "fix" what it is judging.
+- **No false triggers**: the keyword is ignored inside fenced code blocks, and "no agent-voting" switches it off mid-session.
+
+Implementation (all under `~/.config/kilo/`, no source patches):
+
+| File | Role |
+|---|---|
+| `plugin/agent-voting.ts` | Keyword detect → degree classify → system-prompt inject (`experimental.chat.system.transform`) → temperature bump for candidate diversity |
+| `skill/agent-voting/SKILL.md` | Full methodology, loaded on demand |
+| `agent/candidate.md`, `agent/verifier.md` | Generator / read-only judge subagents |
+| `command/agent-voting.md` | `/agent-voting [N] [rounds]` explicit-degree escape hatch |
+
+Plugin activity is logged to `~/.local/state/kilo/agent-voting-plugin.log`.
 
 ---
 
