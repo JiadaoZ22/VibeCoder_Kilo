@@ -57,7 +57,10 @@ This matches the `/kiloclaw` pattern: keep the functional gate, but route unprov
 
 ## Build artifacts
 
-Per the repo's immutable-build policy, previous binaries were kept and a new artifact was produced:
+> **Superseded 2026-08-19** — see `b_Mobile-NotFound-ResumedSession-Fix.md` → "Install layout after 2026-08-19 cleanup".
+> The npm-global `@kilocode/cli` package and the `bin/versions/` immutable-artifact scheme below were **uninstalled/removed** on 2026-08-19. `~/.npm-global/bin/kilo` now symlinks directly to the source-tree build at `kilo-source/packages/opencode/dist/@kilocode/cli-linux-x64/bin/kilo` (version `0.0.0-fix-qdrant-check-compatibility-202608190324`). The roll-back instructions further down no longer apply.
+
+Historical record (no longer on disk):
 
 | Artifact | Path | Active? |
 |---|---|---|
@@ -66,14 +69,7 @@ Per the repo's immutable-build policy, previous binaries were kept and a new art
 | Second attempt (`auth-status` gate, but `enabled` was tied to it so the command stayed hidden) | `~/.npm-global/lib/node_modules/@kilocode/cli/bin/versions/kilo-7.4.22-ccd56a518b-20260818-080606` | ❌ |
 | Final corrected build (visible + `auth-status` runtime gate) | `~/.npm-global/lib/node_modules/@kilocode/cli/bin/versions/kilo-7.4.22-ccd56a518b-20260818-100505` | ✅ |
 
-The active binary is selected by the `.kilo` symlink:
-
-```bash
-readlink -f ~/.npm-global/lib/node_modules/@kilocode/cli/bin/.kilo
-# -> .../kilo-7.4.22-ccd56a518b-20260818-100505
-```
-
-`~/.npm-global/bin/kilo` now points to the npm launcher shim (`.../bin/kilo`) rather than directly into `kilo-source/packages/opencode/dist/`, so future rebuilds cannot silently mutate the installed CLI.
+The active binary was selected by a `.kilo` symlink inside the npm package (`.../bin/.kilo`), and `~/.npm-global/bin/kilo` pointed to the npm launcher shim. **As of 2026-08-19 both are gone** — the npm package was uninstalled and `~/.npm-global/bin/kilo` symlinks directly into `kilo-source/packages/opencode/dist/…`.
 
 ---
 
@@ -99,22 +95,21 @@ Remote session relay requires a Kilo account. Run `kilo auth login` and restart 
 
 ## Roll back
 
+> **No longer applicable (2026-08-19).** The npm `bin/versions/` artifacts and the `~/.kilo-active-previous` marker were removed. The historical commands were:
+
 ```bash
+# REMOVED — do not run; paths no longer exist
 BIN=~/.npm-global/lib/node_modules/@kilocode/cli/bin
 ln -sfn "$(cat ~/.kilo-active-previous)" "$BIN/.kilo"
-kilo --version
 ```
+
+Current rollback path: rebuild or re-point `~/.npm-global/bin/kilo` to another `kilo-source/packages/opencode/dist*/…/bin/kilo` binary.
 
 ---
 
 ## Notes
 
-- Pre-existing Kilo TUI sessions were running against the `dist/` binary during the builds, so those directories were renamed to `dist-old-running` and `dist-old-running-2` to allow builds to proceed without killing those sessions. Once those sessions exit, remove the leftover directories manually:
-
-```bash
-rm -rf /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode/dist-old-running
-rm -rf /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/kilo-source/packages/opencode/dist-old-running-2
-```
+- Pre-existing Kilo TUI sessions were running against the `dist/` binary during the builds, so those directories were renamed aside to allow builds to proceed without killing those sessions. **Cleanup done 2026-08-19:** `dist-old-running-2` and `dist-old-running-3` were removed; `dist-old-running` and `dist-old-running-4` were renamed to `.dist-old-running.deleted` / `.dist-old-running-4.deleted` (FUSE inodes still held open by running old processes — safe to `rm -rf` once they exit).
 
 - `packages/opencode/src/kilocode/` already contains `kilocode` in its path, so no `kilocode_change` markers were needed for this edit.
 - Package-level `bun run typecheck` in `packages/opencode/` reports pre-existing errors unrelated to this change (missing `defaultLayer` / `layer` properties in `bootstrap.ts` and a benchmark test). The edited file compiled cleanly.
