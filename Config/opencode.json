@@ -16,7 +16,7 @@
     "enabled": true,
     "provider": "openai-compatible",
     "model": "doubao-embedding-vision",
-    "dimension": 1024,
+    "dimension": 2048,
     "vectorStore": "lancedb",
     "openai-compatible": {
       "apiKey": "",
@@ -117,8 +117,14 @@
   },
   "permission": {
     "bash": "allow",
+    "read": {
+      "*": "allow"
+    },
     "*": {
       "*": "allow"
+    },
+    "external_directory": {
+      "/media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/*": "allow"
     }
   }
 }
