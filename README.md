@@ -1,8 +1,9 @@
 # VibeCoder Kilo — Kilo Code CLI Configuration
 
-> **Current binary:** Kilo Code `0.0.0-fix-qdrant-check-compatibility-202608190324` (built from upstream Kilo `v7.4.22` merged into the local `fix/qdrant-check-compatibility` fork).  
-> **Last updated:** 2026-08-19.  
+> **Current binary:** Kilo Code `0.0.0-dev-zoujd-mainline-202608200243` (built from upstream Kilo `v7.4.22` merged into the local `dev/zoujd-mainline` fork).  
+> **Last updated:** 2026-08-20.  
 > **New (2026-08-19):** **"Agent-Voting" verification-scaling** — say the word `agent-voting` in any prompt (or `/agent-voting N rounds <task>`) to auto fan out N candidate subagents plus a read-only verifier that scores and selects. See [Agent-Voting](#agent-voting--one-word-verification-scaling) and [`Update/20260819_Plugin/`](Update/20260819_Plugin).  
+> **New (2026-08-20):** **Doubao Search MCP** — web search is back when using Ark/Volcano Engine as the provider. Add a single MCP block to `~/.config/kilo/opencode.json`; search queries hit the official Volcengine endpoint `open.feedcoopapi.com` and the optional AI filter runs through the official Ark endpoint. See [Doubao Search MCP](#doubao-search-mcp) and [`Config/ReadMe.md`](Config/ReadMe.md).  
 > **Fixed (2026-08-19):** mobile "not found" on `/remote` sessions — resumed sessions are now bootstrapped to the session relay on the first advertising heartbeat. See [`Bugs/Remote-Command/b_Mobile-NotFound-ResumedSession-Fix.md`](Bugs/Remote-Command/b_Mobile-NotFound-ResumedSession-Fix.md).  
 > **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.  
 > **🔒 Build policy:** New builds are stored as separate immutable artifacts; the working binary is never overwritten and old versions are deleted **only by hand** — see [Build Policy](#build-policy--never-overwrite-the-working-binary).
@@ -26,7 +27,7 @@ This repository stores the configuration files and documentation for running [Ki
 
 > **The stock `npm install -g @kilocode/cli` package contains known upstream bugs** — most notably the Qdrant "Failed to obtain server version" warning on every startup, plus several indexing (IDX) reliability issues. To get a clean, bug-free experience, **build and install your own binary from the patched source** included in this repository.
 
-The patched source is pinned to upstream **Kilo `v7.4.16`** plus local fixes for Ark/Doubao embeddings and Qdrant/IDX stability.
+The patched source is pinned to upstream **Kilo `v7.4.22`** plus local fixes on the `dev/zoujd-mainline` branch for Ark/Doubao embeddings, Qdrant/IDX stability, remote-session resumption, and Doubao Search MCP integration.
 
 ### Why Build Yourself?
 
@@ -288,7 +289,8 @@ All configured models are OpenAI-compatible endpoints served through Ark:
 **Language models**
 - `ark-code-latest` (Auto-routing, 128K context)
 - `doubao-seed-2.0-code` / `pro` / `lite` (128K context)
-- `doubao-seed-2.0-mini` (256K context — default compaction model)
+- `doubao-seed-2.0-mini` (256K context)
+- `doubao-seed-2.0-lite` (256K context — default compaction / memory model)
 - `doubao-seed-code` (128K context)
 - `doubao-seed-evolving` (Coding & Agent, weekly upgrade, **1M context** — [Volcano Ark docs](https://www.volcengine.com/docs/82379))
 - `minimax-latest`
@@ -336,6 +338,52 @@ Plugin activity is logged to `~/.local/state/kilo/agent-voting-plugin.log`.
 
 ---
 
+## Doubao Search MCP
+
+When Kilo's provider is set to Ark/Volcano Engine, the built-in web-search tool is unavailable (it is an Anthropic-server-side tool). The **Doubao Search MCP** restores web search using Volcengine's own Doubao Search API.
+
+### What you get
+
+- `doubao_search(query, count, snippet_length, ...)` — web search with long-form snippets, publish time, and source URLs.
+- Optional `doubao_cross_check(...)` — multi-source fact-checking (only when the AI enhancement layer is enabled).
+- Optional **AI enhancement layer** — filters/compresses raw search results with `doubao-seed-2-0-lite-260215` via the official Ark endpoint before they enter the main context window.
+
+### Quick setup
+
+1. Get a **Doubao Search API Key** from the [Volcengine Doubao Search console](https://console.volcengine.com/byteair/app/doubao-search/) (500 free searches/month).
+2. Add the MCP block to `~/.config/kilo/opencode.json`:
+
+```json
+{
+  "mcp": {
+    "doubao-search": {
+      "type": "local",
+      "command": ["npx", "-y", "github:alchaincyf/huashu-doubao-search"],
+      "environment": {
+        "DOUBAO_SEARCH_API_KEY": "<paste-your-doubao-search-api-key>",
+        "DOUBAO_SEARCH_VERSION": "global",
+        "ARK_API_KEY": "<paste-your-ark-api-key>",
+        "ARK_MODEL": "doubao-seed-2-0-lite-260215"
+      },
+      "enabled": true,
+      "timeout": 120000
+    }
+  }
+}
+```
+
+3. Restart Kilo and run `> /mcp list` to confirm `doubao-search` is loaded.
+
+### Safety
+
+- Search queries are sent to `open.feedcoopapi.com`, the official Doubao Search API host documented by Volcengine for the [Global version](https://www.volcengine.com/docs/87772/2548026) and [Custom version](https://www.volcengine.com/docs/87772/2272953).
+- The optional AI filter sends raw results to the official Ark endpoint `ark.cn-beijing.volces.com/api/v3`.
+- No data is sent to any other third party.
+
+Full configuration details, timeout notes, and security guidance are in [`Config/ReadMe.md`](Config/ReadMe.md).
+
+---
+
 ## Managing Oversized Context
 
 As sessions grow, context-window exhaustion causes slower responses, truncated outputs, or lost reasoning. Use this **layered strategy** to keep Kilo fast and effective.
@@ -356,12 +404,12 @@ Use **`/compact`** (or **`/summarize`**) regularly to condense conversation hist
 /compact preserve the database schema decisions and auth flow
 ```
 
-**Use a dedicated lightweight compaction model:** By default Kilo falls back to your chat model (e.g., `ark-code-latest`) for compaction summaries. The bundled `Config/opencode.json` now pins compaction to `ark/doubao-seed-2.0-mini` with thinking disabled (`reasoningEffort: minimal`), which is smaller, faster, and cheaper than the chat model. If you copy the config template, this is already set; otherwise add it manually:
+**Use a dedicated lightweight compaction model:** By default Kilo falls back to your chat model (e.g., `ark-code-latest`) for compaction summaries. The bundled `Config/opencode.json` now pins compaction to `ark/doubao-seed-2.0-lite` with thinking disabled (`reasoningEffort: minimal`), which is faster and more capable than `2.0-mini` for these background tasks. If you copy the config template, this is already set; otherwise add it manually:
 
 ```json
 "agent": {
   "compaction": {
-    "model": "ark/doubao-seed-2.0-mini",
+    "model": "ark/doubao-seed-2.0-lite",
     "options": {
       "reasoningEffort": "minimal"
     }
@@ -606,4 +654,6 @@ kilo session list
 
 - [Kilo Code CLI Docs](https://kilo.ai/docs/code-with-ai/platforms/cli)
 - [Ark API Docs](https://www.volcengine.com/docs/82379/1928261?lang=zh)
+- [Doubao Search Global API](https://www.volcengine.com/docs/87772/2548026?lang=en)
+- [Doubao Search Custom API](https://www.volcengine.com/docs/87772/2272953?lang=en)
 - [MCP Vector Search Server](https://github.com/modelcontextprotocol/servers/tree/main/src/vector-search)
