@@ -76,7 +76,7 @@ Body = condensed from existing sources (reference them by absolute path, do not 
 2. `pip install llm-verifier` in an **isolated venv** (repo policy: no global pip installs), e.g. `~/.local/share/llm-verifier-venv/`.
 3. Wrap `llm_verifier.select(problem, candidates, criteria)` as a small local MCP server exposing `verifier_score`.
 4. Register under `mcp` in `~/.config/kilo/opencode.json`; set tool permission `llmverifier_*` explicitly.
-5. Reference implementation to copy from: `0_Skills_MCP/Program/ai-agent-dev/verification-selfimprove/llm-as-a-verifier` and `.../TurboAgent` (proxy + pivot tournament).
+5. Reference implementation to copy from: `1_References/Program/ai-agent-dev/verification-selfimprove/llm-as-a-verifier` and `.../TurboAgent` (proxy + pivot tournament).
 
 ## Step 7 — Validate
 

@@ -20,7 +20,7 @@ Today the workflow is manual: the user writes a prompt that *tells* the coding a
 
 ## 2. Background — why this works (already collected, 2026-08-19)
 
-Vendored at `0_Skills_MCP/Program/ai-agent-dev/verification-selfimprove/` (8 submodules, all starred). Core empirical claim: **a weak generator + a fine-grained verifier beats a strong generator sampled once.**
+Vendored at `1_References/Program/ai-agent-dev/verification-selfimprove/` (8 submodules, all starred). Core empirical claim: **a weak generator + a fine-grained verifier beats a strong generator sampled once.**
 
 | Repo | Role in this design |
 |---|---|
