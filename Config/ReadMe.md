@@ -28,6 +28,64 @@ npm install -g @kilocode/cli
     2. Run `/models` in the TUI to switch models if needed.
     3. If you ever want to rotate the key without editing this file, replace `"apiKey": ""` with `"apiKey": "{env:ARK_API_KEY}"` and set the environment variable instead.
 
+> **Model preference:** `ark/doubao-seed-2.0-lite` is used for agent compaction and memory (instead of `2.0-mini`) because it is faster and cheaper, with no measurable quality loss for these background tasks.
+
+---
+
+## Optional: Doubao Search MCP (Web Search)
+
+Kilo's built-in web search is disabled when the provider is switched to Ark (Volcano Engine) or other domestic endpoints. The [huashu-doubao-search](https://github.com/alchaincyf/huashu-doubao-search) MCP server bridges this gap using Volcengine's [Doubao Search Global API](https://docs.volcengine.com/docs/87772/2272949?lang=en).
+
+### What it adds
+
+- `doubao_search(query, count, snippet_length, ...)` — web search with long-form snippets, publish time, and source URLs.
+- `doubao_cross_check(...)` — multi-source fact-checking (only appears when the AI enhancement layer is enabled).
+- Optional **AI enhancement layer** — compresses/filters raw search results with a small Ark model before they enter the main context window.
+
+### Requirements
+
+- npm/npx (already needed by Kilo CLI).
+- A **Doubao Search API Key** from the [Volcengine Doubao Search console](https://console.volcengine.com/byteair/app/doubao-search/). 500 free searches/month.
+- For the AI enhancement layer, an **Ark API Key** (reuse the same one configured above for the `ark` provider).
+
+### Configuration
+
+Add this block to `~/.config/kilo/opencode.json` under `mcp`:
+
+```json
+{
+  "mcp": {
+    "doubao-search": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "github:alchaincyf/huashu-doubao-search"],
+      "environment": {
+        "DOUBAO_SEARCH_API_KEY": "<paste-your-doubao-search-api-key>",
+        "DOUBAO_SEARCH_VERSION": "global",
+        "ARK_API_KEY": "<paste-your-ark-api-key>",
+        "ARK_MODEL": "doubao-seed-2-0-lite-260215"
+      },
+      "enabled": true
+    }
+  }
+}
+```
+
+- `DOUBAO_SEARCH_VERSION`: `global` (default, better global coverage) or `custom` (faster, authority-level filtering). See the [official comparison](https://docs.volcengine.com/docs/87772/2272949?lang=en).
+- `ARK_MODEL`: the AI-enhancement post-processing model. Default and recommended is `doubao-seed-2-0-lite-260215` (Seed 2.0 Lite). This is **not** the same string as Kilo's provider alias `ark/doubao-seed-2.0-lite`; it is the Volcengine endpoint model ID used by the MCP server directly.
+- **No source rebuild required** — this is a config-only change; restart Kilo to load the new MCP.
+
+### Network notes
+
+If you are behind a proxy that blocks `pypi.org` or GitHub, configure mirrors first:
+
+- `~/.config/uv/uv.toml` for uv/uvx-based tools (see `Bugs/Channel-Database/Problem.md`).
+- npm mirror in `~/.npmrc` if npm registry access is unstable.
+
+### Security
+
+Keep API keys in `opencode.json` only on the local machine (this file is under `~/.config/kilo/`, not the repository). For shared machines, use `"{env:DOUBAO_SEARCH_API_KEY}"` and set the key in your shell environment instead.
+
 ---
 
 ## Optional: Vector Search MCP (Memory Embedding)
