@@ -78,6 +78,40 @@ Add this block to `~/.config/kilo/opencode.json` under `mcp`:
 - `ARK_MODEL`: the AI-enhancement post-processing model. Default and recommended is `doubao-seed-2-0-lite-260215` (Seed 2.0 Lite). This is **not** the same string as Kilo's provider alias `ark/doubao-seed-2.0-lite`; it is the Volcengine endpoint model ID used by the MCP server directly.
 - **No source rebuild required** — this is a config-only change; restart Kilo to load the new MCP.
 
+### Is `open.feedcoopapi.com` an official Volcengine domain?
+
+**Short answer**: `open.feedcoopapi.com` **is an official internal API domain of Volcengine (ByteDance)**. It is NOT an unknown / untrusted third‑party link.
+
+#### Background verification
+
+1. This host is the official endpoint for Volcengine’s **Doubao Search (豆包搜索 / Ask‑Echo)** API service, documented in Volcengine public documentation.
+   - [Global version API reference](https://www.volcengine.com/docs/87772/2548026) lists `https://open.feedcoopapi.com/search_api/global_search`.
+   - [Custom version API reference](https://www.volcengine.com/docs/87772/2272953) lists `https://open.feedcoopapi.com/search_api/web_search`.
+2. The other endpoint `ark.cn-beijing.volces.com` is the Volcengine Ark LLM inference endpoint, also fully ByteDance-owned cloud infrastructure.
+
+#### Network flow
+
+```text
+Your local MCP client → open.feedcoopapi.com         (Volcengine search service)
+Your local MCP client → ark.cn-beijing.volces.com    (Volcengine LLM inference)
+```
+
+All traffic stays within ByteDance-Volcengine cloud; **no external third-party service is injected**. There is no risk of redirection to malicious outside servers.
+
+#### What you can do to double-check for safety
+
+1. **Inspect network traffic:** Monitor outbound HTTPS requests from your MCP process and confirm DNS resolves to Volcengine-owned IP ranges.
+2. **Review source code:**
+   - Community [huashu-doubao-search](https://github.com/alchaincyf/huashu-doubao-search): its compiled `dist/index.js` hardcodes `open.feedcoopapi.com` as the default search base URL; you can audit the GitHub source directly.
+   - Official [volcengine/mcp-server](https://github.com/volcengine/mcp-server) also references this same API host in source code.
+3. **Certificate check:** When HTTPS requests happen, the SSL certificate issuer belongs to Volcengine/ByteDance.
+
+#### Important caveat
+
+Even though this domain is legitimate, **you still need to protect your `DOUBAO_SEARCH_API_KEY`**. If your local environment gets compromised, your API key may get leaked.
+
+> There is no “bad-link / untrusted external domain” risk here. The search and AI-enhancement calls both hit Volcengine-controlled backend services.
+
 ### Network notes
 
 If you are behind a proxy that blocks `pypi.org` or GitHub, configure mirrors first:
