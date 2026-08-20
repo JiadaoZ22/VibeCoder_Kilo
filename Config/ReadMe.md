@@ -30,6 +30,33 @@ npm install -g @kilocode/cli
 
 ---
 
+## Web Search MCP (Doubao Search)
+
+Doubao Search (豆包搜索, ex 联网搜索) has two versions — [version comparison](https://docs.volcengine.com/docs/87772/2272949?lang=en): **Global** (global sites, per-result `ContentTokenCount`, pay-as-you-go only) and **Custom** (lower latency, fuller body text, subscription plans). 500 free searches/month shared across both.
+
+Two MCP entries exist in `~/.config/kilo/opencode.json`:
+
+| MCP name | Server | Version | Key |
+|---|---|---|---|
+| `doubao-search` | `huashu-doubao-search` (local clone at `~/.local/share/kilo/mcp/huashu-doubao-search`) | **Global** by default (`DOUBAO_SEARCH_VERSION=global`); pass `version: "custom"` per call to switch | `DOUBAO_SEARCH_API_KEY` — dedicated key from the 豆包搜索 console |
+| `doubao-search-custom` | Volcengine `mcp_server_askecho_search_infinity` via `uvx` | Custom版 (`web_search` endpoint) | Ark exclusive-plan key — verified working 2026-08-20 |
+
+**Key facts verified by direct API calls (2026-08-20):**
+
+- The Ark exclusive-plan key **works** on the Custom版 endpoint `https://open.feedcoopapi.com/search_api/web_search` (returned real results).
+- The same Ark key is **rejected** on the Global版 endpoint `.../global_search` with `700901 invalid_api_key`. Global版 requires a dedicated key created in the 豆包搜索 (联网搜索) console → API Key管理 → 按量后付费 ([Global版 API doc](https://www.volcengine.com/docs/87772/2548026)).
+- If the console shows 0 token consumption, no successful search ever ran — the uvx server was failing to start (PyPI blocked; fixed via `~/.config/uv/uv.toml` TUNA mirror) and the Global key was never created.
+
+**One manual step:** paste the console API key into `mcp.doubao-search.environment.DOUBAO_SEARCH_API_KEY` in `opencode.json`, then restart Kilo. Until then the `doubao_search` tool answers `invalid api key`; `doubao-search-custom` keeps working meanwhile.
+
+The `doubao-search` entry also sets `ARK_API_KEY`/`ARK_BASE_URL`/`ARK_MODEL`, enabling the server's optional AI layer (`max_tokens` context compression, `doubao_cross_check` multi-source verification) on the Ark plan endpoint — failures there degrade gracefully to raw search results.
+
+> **MCP editing note:** Kilo's TUI MCP dialog (`/mcp`) is view + enable/disable **toggle only** — there is no edit UI (`packages/tui/src/component/dialog-mcp.tsx` has a single `toggle` action). Edit `opencode.json` directly and restart.
+
+> **Network note:** this machine's proxy TLS-blocks pypi.org and registry.npmjs.org. Mirrors are configured globally: `~/.config/uv/uv.toml` (TUNA PyPI) and `~/.npmrc` (npmmirror). `github.com` is intermittently unreachable — if a clone/push times out, retry or use `https://gitclone.com/github.com/<owner>/<repo>.git`.
+
+---
+
 ## Optional: Vector Search MCP (Memory Embedding)
 
 To mitigate context-window exhaustion, you can enable a **local vector-search MCP server** that indexes your codebase and retrieves only the most relevant snippets before each query.
