@@ -42,9 +42,9 @@ Since the branch name is now stable (`dev/zoujd-mainline`), the channel — and 
 
 ## Issue 2 — doubao-search MCP fails to start
 
-### Root cause
+### Root cause (at that moment)
 
-The MCP (`~/.config/kilo/opencode.json` → `mcp.doubao-search`) launches via `uvx --from git+https://github.com/volcengine/mcp-server#…`. The git fetch worked, but dependency resolution hit `https://pypi.org/simple/…` → **TLS handshake EOF** — the same local-proxy interference documented in `Bugs/Balance-Fetch/Problem.md` (pypi.org joins the blocked list: npmjs, plugins.gradle.org, packages.jetbrains.team, cdn.sheetjs.com).
+The MCP (`~/.config/kilo/opencode.json` → `mcp.doubao-search`) launched via `uvx --from git+https://github.com/volcengine/mcp-server#…`. The git fetch worked, but dependency resolution hit `https://pypi.org/simple/…` → **TLS handshake EOF** — the same local-proxy interference documented in `Bugs/Balance-Fetch/Problem.md`.
 
 Not related to the new binary; any fresh uvx resolve would have failed the same way.
 
@@ -58,4 +58,4 @@ url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 default = true
 ```
 
-Verified 2026-08-20: `uvx --from git+https://github.com/volcengine/mcp-server#subdirectory=server/mcp_server_askecho_search_infinity mcp-server-askecho-search-infinity --help` installs 37 packages via the mirror and prints usage. The uvx environment is now cached, so later MCP starts do not depend on the network at all.
+This lets PyPI-based MCP servers install. The exact MCP entry, however, is being configured manually per the [Ark console docs](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2301412?lang=zh); no third-party MCP server is being kept as a bundled default.
