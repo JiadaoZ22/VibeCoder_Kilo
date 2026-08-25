@@ -416,6 +416,44 @@ If you have a Midea internal `msk-` API key, you can route Kilo through a small 
 
 The bundled `Config/opencode.json` already contains the matching `midea` provider block pointing at `http://127.0.0.1:8000/v1` with a dummy API key. The real authentication happens inside the proxy.
 
+### Usage in Kilo
+
+After the proxy is running and Kilo is restarted, switch the active model:
+
+```text
+> /models
+# select midea/volcengine-glm-5.3
+```
+
+Now every prompt routes through Midea AIMP. To go back to Ark:
+
+```text
+> /models
+# select ark/ark-code-latest
+```
+
+### Keep the proxy alive
+
+The proxy must stay running while Kilo is active. The simplest background option:
+
+```bash
+nohup python /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/Config/midea-proxy.py > /tmp/midea-proxy.log 2>&1 &
+disown
+```
+
+Stop it later with:
+
+```bash
+pkill -f midea-proxy.py
+```
+
+For systemd auto-start, curl smoke-test, and troubleshooting table, see [`Config/ReadMe.md`](Config/ReadMe.md).
+
+### Security
+
+- Never commit the `msk-` key or your 4A account.
+- The proxy only binds to `127.0.0.1`, so it is not reachable from other machines on the network.
+
 See [`Config/ReadMe.md`](Config/ReadMe.md) for the full proxy reference, environment variables, and caveats.
 
 ---

@@ -207,10 +207,102 @@ Start or restart Kilo, then run:
 
 and select `midea/volcengine-glm-5.3`.
 
+### Using Midea in a Kilo session
+
+Once the proxy is running and Kilo is using `midea/volcengine-glm-5.3`, chat normally. The model name is shown in the status bar; all completions go through the local proxy to Midea AIMP.
+
+To switch back to Ark at any time:
+
+```text
+> /models
+# select ark/ark-code-latest   (or any other Ark model)
+```
+
+### Verify the proxy works (without Kilo)
+
+Before starting Kilo, test the proxy with curl:
+
+```bash
+curl -s http://127.0.0.1:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dummy" \
+  -d '{
+    "model": "volcengine-glm-5.3",
+    "stream": false,
+    "messages": [{"role": "user", "content": "hello"}]
+  }'
+```
+
+If you see a JSON response with assistant content, the proxy and your credentials are good. If you see a 403, check `MIDEA_AIGC_USER` and `MIDEA_MSK_API_KEY`.
+
+### Run the proxy in the background
+
+The proxy must stay alive while Kilo runs. Quick options:
+
+**Option A — `nohup` / disown:**
+
+```bash
+nohup python /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/Config/midea-proxy.py > /tmp/midea-proxy.log 2>&1 &
+disown
+```
+
+Stop later with:
+
+```bash
+pkill -f midea-proxy.py
+```
+
+**Option B — tmux / screen session:**
+
+```bash
+tmux new -s midea-proxy
+python /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/Config/midea-proxy.py
+# detach with Ctrl-B then D
+```
+
+**Option C — systemd user service (auto-start on login):**
+
+Create `~/.config/systemd/user/midea-proxy.service`:
+
+```ini
+[Unit]
+Description=Midea AIMP local proxy for Kilo
+After=network.target
+
+[Service]
+Type=simple
+Environment="MIDEA_MSK_API_KEY=msk-..."
+Environment="MIDEA_AIGC_USER=your_4a_account"
+ExecStart=/usr/bin/python3 /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/Config/midea-proxy.py
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+Then:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable midea-proxy.service
+systemctl --user start midea-proxy.service
+systemctl --user status midea-proxy.service
+```
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `Failed to connect to 127.0.0.1:8000` in Kilo | Proxy not running | Start `midea-proxy.py` first. |
+| Upstream returns 403 | `MIDEA_AIGC_USER` missing/incorrect or `MIDEA_MSK_API_KEY` invalid | Check both env vars, restart proxy. |
+| Kilo shows `model not found` | Not switched to the Midea provider | Run `> /models` and pick `midea/volcengine-glm-5.3`. |
+| Slow first response | Cold start / token generation | Normal; GLM 5.3 first-token latency can be a few seconds. |
+
 ### Caveats
 
 - The proxy must be running before you start Kilo; if the proxy stops, Kilo will fail to get completions.
 - The upstream currently exposes only the `volcengine-glm-5.3` model through this path.
+- `midea-proxy.py` rewrites the `model` field in the request body to `volcengine-glm-5.3` by default. If Midea later supports more models through the same endpoint, set `MIDEA_FORCE_MODEL` accordingly.
 - Keep your `msk-` key and 4A account off GitHub and out of `opencode.json`.
 
 ---
