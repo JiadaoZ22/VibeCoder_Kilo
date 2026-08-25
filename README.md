@@ -1,14 +1,15 @@
 # VibeCoder Kilo — Kilo Code CLI Configuration
 
 > **Current binary:** Kilo Code `0.0.0-dev-zoujd-mainline-202608200243` (built from upstream Kilo `v7.4.22` merged into the local `dev/zoujd-mainline` fork).  
-> **Last updated:** 2026-08-20.  
+> **Last updated:** 2026-08-25.  
 > **New (2026-08-19):** **"Agent-Voting" verification-scaling** — say the word `agent-voting` in any prompt (or `/agent-voting N rounds <task>`) to auto fan out N candidate subagents plus a read-only verifier that scores and selects. See [Agent-Voting](#agent-voting--one-word-verification-scaling) and [`Update/20260819_Plugin/`](Update/20260819_Plugin).  
 > **New (2026-08-20):** **Doubao Search MCP** — web search is back when using Ark/Volcano Engine as the provider. Add a single MCP block to `~/.config/kilo/opencode.json`; search queries hit the official Volcengine endpoint `open.feedcoopapi.com` and the optional AI filter runs through the official Ark endpoint. See [Doubao Search MCP](#doubao-search-mcp) and [`Config/ReadMe.md`](Config/ReadMe.md).  
+> **New (2026-08-25):** **Midea AIMP provider** — use an internal Midea `msk-` API key through a local reverse proxy that injects the required `Aimp-Biz-Id` / `AIGC-USER` headers. See [Midea AIMP Provider](#midea-aimp-provider) and [`Config/ReadMe.md`](Config/ReadMe.md).  
 > **Fixed (2026-08-19):** mobile "not found" on `/remote` sessions — resumed sessions are now bootstrapped to the session relay on the first advertising heartbeat. See [`Bugs/Remote-Command/b_Mobile-NotFound-ResumedSession-Fix.md`](Bugs/Remote-Command/b_Mobile-NotFound-ResumedSession-Fix.md).  
 > **Context management:** auto-compaction, pruning, and provider overflow detection are enabled by default for models with known context limits.  
 > **🔒 Build policy:** New builds are stored as separate immutable artifacts; the working binary is never overwritten and old versions are deleted **only by hand** — see [Build Policy](#build-policy--never-overwrite-the-working-binary).
 
-This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟 — 专属 API Key)** provider and optional **vector-search MCP** for intelligent code retrieval.
+This repository stores the configuration files and documentation for running [Kilo Code CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) with the **Volcano Ark (火山方舟 — 专属 API Key)** provider, optional **Doubao Search MCP**, optional **Midea AIMP provider** (via a local proxy), and optional **vector-search MCP** for intelligent code retrieval.
 
 ---
 
@@ -18,6 +19,7 @@ This repository stores the configuration files and documentation for running [Ki
 |------|---------|
 | `Config/opencode.json` | Kilo main configuration (models, provider, MCP servers) |
 | `Config/auth.json` | API-key storage template for OpenRouter & Ark |
+| `Config/midea-proxy.py` | Local reverse proxy for Midea AIMP `msk-` keys |
 | `Config/kiloindexignore` | Template for `~/.kilocode/.kiloindexignore` (global IDX data-type ignores) |
 | `Config/ReadMe.md` | Detailed setup & troubleshooting guide |
 
@@ -381,6 +383,40 @@ When Kilo's provider is set to Ark/Volcano Engine, the built-in web-search tool 
 - No data is sent to any other third party.
 
 Full configuration details, timeout notes, and security guidance are in [`Config/ReadMe.md`](Config/ReadMe.md).
+
+---
+
+## Midea AIMP Provider
+
+If you have a Midea internal `msk-` API key, you can route Kilo through a small local reverse proxy that injects the two extra HTTP headers (`Aimp-Biz-Id` and `AIGC-USER`) the Midea AIMP endpoint requires.
+
+### Quick setup
+
+1. Install Python dependencies:
+   ```bash
+   pip install fastapi uvicorn httpx
+   ```
+
+2. Export credentials (never commit these):
+   ```bash
+   export MIDEA_MSK_API_KEY="msk-..."
+   export MIDEA_AIGC_USER="your_4a_account"
+   ```
+
+3. Start the proxy:
+   ```bash
+   python /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/Config/midea-proxy.py
+   ```
+
+4. In Kilo, switch model:
+   ```text
+   > /models
+   # select midea/volcengine-glm-5.3
+   ```
+
+The bundled `Config/opencode.json` already contains the matching `midea` provider block pointing at `http://127.0.0.1:8000/v1` with a dummy API key. The real authentication happens inside the proxy.
+
+See [`Config/ReadMe.md`](Config/ReadMe.md) for the full proxy reference, environment variables, and caveats.
 
 ---
 

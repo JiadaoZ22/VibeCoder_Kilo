@@ -3,14 +3,14 @@
   "model": "ark/ark-code-latest",
   "agent": {
     "compaction": {
-      "model": "ark/doubao-seed-2.0-mini",
+      "model": "ark/doubao-seed-2.0-lite",
       "options": {
         "reasoningEffort": "minimal"
       }
     }
   },
   "memory": {
-    "model": "ark/doubao-seed-2.0-mini"
+    "model": "ark/doubao-seed-2.0-lite"
   },
   "indexing": {
     "enabled": true,
@@ -111,6 +111,20 @@
         },
         "doubao-seedream-5.0-lite": {
           "name": "Doubao Seedream 5.0 Lite (Vision)"
+        }
+      }
+    },
+    "midea": {
+      "name": "Midea AIMP (local proxy)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "apiKey": "dummy",
+        "baseURL": "http://127.0.0.1:8000/v1"
+      },
+      "models": {
+        "volcengine-glm-5.3": {
+          "name": "Midea AIMP - GLM 5.3",
+          "limit": { "context": 1000000, "output": 131072 }
         }
       }
     }

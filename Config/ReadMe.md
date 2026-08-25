@@ -125,6 +125,96 @@ Keep API keys in `opencode.json` only on the local machine (this file is under `
 
 ---
 
+## Optional: Midea AIMP Provider (internal proxy)
+
+If you have a Midea internal `msk-` API key for the AIMP OpenAI-compatible endpoint, you can use it with Kilo through a **local reverse proxy**. The upstream endpoint requires two extra HTTP headers (`Aimp-Biz-Id` and `AIGC-USER`) that Kilo cannot inject directly, so the proxy adds them for you.
+
+### How it works
+
+```text
+Kilo → http://127.0.0.1:8000/v1  →  midea-proxy.py  →  https://aimpapi.midea.com/t-aigc/mip-chat-app/openai/v1
+```
+
+The proxy runs only on `127.0.0.1`; nothing is exposed to the network. The real `msk-` key and your 4A account never touch `opencode.json`.
+
+### 1. Install dependencies
+
+```bash
+pip install fastapi uvicorn httpx
+```
+
+### 2. Set credentials as environment variables
+
+```bash
+export MIDEA_MSK_API_KEY="msk-xxxxxxxxxxxxxxxx"
+export MIDEA_AIGC_USER="your_4a_account"
+# optional:
+export MIDEA_PROXY_PORT="8000"
+export MIDEA_AIMP_BIZ_ID="volcengine-glm-5.3"
+```
+
+- `MIDEA_MSK_API_KEY`: your Midea `msk-...` key.
+- `MIDEA_AIGC_USER`: **your real 4A account**; the upstream returns 403 without it.
+- `MIDEA_AIMP_BIZ_ID`: defaults to `volcengine-glm-5.3`.
+
+### 3. Start the proxy
+
+```bash
+python /media/zoujd4/DATA1/Users/zoujd4/JDgentLAB/VibeCoder_Kilo/Config/midea-proxy.py
+```
+
+You should see:
+
+```text
+[midea-proxy] starting on http://127.0.0.1:8000/v1
+[midea-proxy] upstream: https://aimpapi.midea.com/t-aigc/mip-chat-app/openai
+```
+
+### 4. Configure Kilo
+
+The bundled `Config/opencode.json` already includes a `midea` provider block:
+
+```json
+{
+  "provider": {
+    "midea": {
+      "name": "Midea AIMP (local proxy)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "apiKey": "dummy",
+        "baseURL": "http://127.0.0.1:8000/v1"
+      },
+      "models": {
+        "volcengine-glm-5.3": {
+          "name": "Midea AIMP - GLM 5.3",
+          "limit": { "context": 1000000, "output": 131072 }
+        }
+      }
+    }
+  }
+}
+```
+
+`apiKey` can be `dummy` because authentication is handled by the proxy.
+
+### 5. Switch model in Kilo
+
+Start or restart Kilo, then run:
+
+```text
+> /models
+```
+
+and select `midea/volcengine-glm-5.3`.
+
+### Caveats
+
+- The proxy must be running before you start Kilo; if the proxy stops, Kilo will fail to get completions.
+- The upstream currently exposes only the `volcengine-glm-5.3` model through this path.
+- Keep your `msk-` key and 4A account off GitHub and out of `opencode.json`.
+
+---
+
 ## Optional: Vector Search MCP (Memory Embedding)
 
 To mitigate context-window exhaustion, you can enable a **local vector-search MCP server** that indexes your codebase and retrieves only the most relevant snippets before each query.
