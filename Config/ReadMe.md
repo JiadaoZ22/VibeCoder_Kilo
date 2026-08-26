@@ -354,6 +354,46 @@ systemctl --user status midea-proxy.service
 - `midea-proxy.py` rewrites the `model` field in the request body to `MIDEA_FORCE_MODEL` so Kilo and the upstream agree on the model name.
 - Keep your `msk-` key and 4A account off GitHub and out of `opencode.json`.
 
+### 12. VS Code extension compatibility
+
+#### Claude Code for VS Code
+
+**Claude Code for VS Code cannot use this Midea AIMP setup directly.**
+
+Claude Code speaks the **Anthropic Messages API** (`/v1/messages`), while the Midea AIMP endpoint is **OpenAI-compatible** (`/v1/chat/completions`). Even if you set `ANTHROPIC_BASE_URL` to the local proxy in Claude Code's VS Code settings, the request shape and response shape do not match, so the upstream will reject the calls.
+
+The only way to make Claude Code work with Midea would be to add an **Anthropic↔OpenAI protocol converter** in front of the proxy. That converter would:
+- translate Anthropic `/v1/messages` requests into OpenAI `/v1/chat/completions` requests,
+- map Anthropic model roles (Haiku/Sonnet/Opus) to the single Midea model your key authorizes,
+- convert SSE streams and tool-calling formats back to Anthropic shape.
+
+That is out of scope for this proxy and is generally fragile. We do **not** recommend it.
+
+#### Recommended alternative: Kilo Code for VS Code
+
+If you want a VS Code experience with the same Midea backend, use the **Kilo Code** extension instead. Kilo Code supports OpenAI-compatible custom providers and can point at the same local proxy.
+
+Install the extension, then in its provider settings:
+
+| Setting | Value |
+|---|---|
+| Provider | `OpenAI Compatible` |
+| Base URL | `http://127.0.0.1:8000/v1` |
+| API Key | `dummy` |
+| Model ID | `qwen3.5-omni` (or whatever your key authorizes) |
+
+Make sure the proxy is running (`~/.local/bin/start-midea-proxy.sh`) before you open a Kilo Code chat.
+
+#### Other VS Code extensions
+
+Any extension that supports an OpenAI-compatible provider (Cline, Roo Code, Continue, etc.) can use the same three values:
+
+- Base URL: `http://127.0.0.1:8000/v1`
+- API Key: `dummy`
+- Model: `qwen3.5-omni`
+
+They all route through the same local proxy, so the same `MIDEA_MSK_API_KEY` and `MIDEA_AIGC_USER` credentials apply.
+
 ---
 
 ## Optional: Vector Search MCP (Memory Embedding)

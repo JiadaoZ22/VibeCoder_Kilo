@@ -483,6 +483,19 @@ pkill -f midea-proxy.py
 
 For systemd auto-start, curl smoke-test, and troubleshooting table, see [`Config/ReadMe.md`](Config/ReadMe.md).
 
+### VS Code support
+
+**Claude Code for VS Code cannot use this setup directly** — it speaks the Anthropic Messages API, while Midea AIMP is OpenAI-compatible. The request/response shapes do not match.
+
+If you want Midea inside VS Code, use an extension that supports OpenAI-compatible providers:
+
+| Extension | Provider type | Base URL | API Key | Model |
+|---|---|---|---|---|
+| **Kilo Code** | OpenAI Compatible | `http://127.0.0.1:8000/v1` | `dummy` | `qwen3.5-omni` |
+| Cline / Roo Code / Continue | OpenAI Compatible | `http://127.0.0.1:8000/v1` | `dummy` | `qwen3.5-omni` |
+
+Start the proxy first, then open the extension's chat. All traffic goes through the same local proxy and the same `MIDEA_MSK_API_KEY` / `MIDEA_AIGC_USER` credentials.
+
 ### Security
 
 - Never commit the `msk-` key or your 4A account.
