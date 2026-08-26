@@ -416,7 +416,39 @@ If you have a Midea internal `msk-` API key, you can route Kilo through a small 
 
 The bundled `Config/opencode.json` already contains the matching `midea` provider block pointing at `http://127.0.0.1:8000/v1` with a dummy API key. The real authentication happens inside the proxy.
 
-> **Model name depends on your key.** The default example is `volcengine-glm-5.3`. If your `msk-` key only authorizes a different model (for example `qwen3.5-omni`), set `MIDEA_FORCE_MODEL` and update the Kilo model name accordingly, then select `midea/qwen3.5-omni`.
+### Which model should I select?
+
+The usable model is decided by your Midea `msk-` key, not by Kilo or the proxy. The template uses `volcengine-glm-5.3` because that is the model shown in Midea's public documentation, but your key may only authorize a different model.
+
+The proxy exposes two knobs for this:
+
+- `MIDEA_AIMP_BIZ_ID` — the `Aimp-Biz-Id` HTTP header required by AIMP. Default: `volcengine-glm-5.3`.
+- `MIDEA_FORCE_MODEL` — the value written into the request body's `model` field. Default: `volcengine-glm-5.3`.
+
+If your key only authorizes `qwen3.5-omni`, set:
+
+```bash
+export MIDEA_FORCE_MODEL="qwen3.5-omni"
+```
+
+and update `~/.config/kilo/opencode.json`:
+
+```json
+{
+  "provider": {
+    "midea": {
+      "models": {
+        "qwen3.5-omni": {
+          "name": "Midea AIMP - Qwen 3.5 Omni",
+          "limit": { "context": 1000000, "output": 131072 }
+        }
+      }
+    }
+  }
+}
+```
+
+Then in Kilo select `midea/qwen3.5-omni`. If you are unsure which model your key supports, start with the default and run the curl smoke test documented in [`Config/ReadMe.md`](Config/ReadMe.md); a 403 or "model not authorized" response tells you to change `MIDEA_FORCE_MODEL`.
 
 ### Usage in Kilo
 

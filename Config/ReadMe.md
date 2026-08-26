@@ -199,9 +199,54 @@ The bundled `Config/opencode.json` already includes a `midea` provider block:
 
 `apiKey` can be `dummy` because authentication is handled by the proxy.
 
-> **Model name must match your key.** The snippet above uses `volcengine-glm-5.3` as the default example from Midea's documentation. If your `msk-` key only authorizes a different model (for example `qwen3.5-omni`), change both the `models` key in `opencode.json` and `MIDEA_FORCE_MODEL` to that value, then select `midea/qwen3.5-omni` in Kilo.
+### 5. Pick the model that matches your `msk-` key
 
-### 5. Switch model in Kilo
+The model name is **not** determined by the proxy or by Kilo — it is determined by what your Midea `msk-` key is authorized to call. The bundled template uses `volcengine-glm-5.3` because that is the example in Midea's public documentation, but your key may only authorize a different model (for example `qwen3.5-omni`).
+
+Midea's OpenAI-compatible endpoint actually receives the model name in **two** places:
+
+| Location | Controlled by | Purpose |
+|---|---|---|
+| HTTP header `Aimp-Biz-Id` | `MIDEA_AIMP_BIZ_ID` | Business/service identifier required by AIMP. |
+| Request body field `model` | `MIDEA_FORCE_MODEL` | The actual model id passed to `/chat/completions`. |
+
+For most keys the two values are the same, but they can differ if Midea assigns a business id that does not exactly match the model id. The proxy lets you set them independently.
+
+#### Example: key only authorizes `qwen3.5-omni`
+
+1. Set the env file (`~/.config/kilo/midea-proxy.env`):
+   ```bash
+   MIDEA_MSK_API_KEY="msk-..."
+   MIDEA_AIGC_USER="zoujd4"
+   MIDEA_AIMP_BIZ_ID="volcengine-glm-5.3"   # keep Midea's default unless you know it must change
+   MIDEA_FORCE_MODEL="qwen3.5-omni"        # the model your key actually authorizes
+   ```
+
+2. Update `~/.config/kilo/opencode.json` so Kilo knows the model name:
+   ```json
+   {
+     "provider": {
+       "midea": {
+         "models": {
+           "qwen3.5-omni": {
+             "name": "Midea AIMP - Qwen 3.5 Omni",
+             "limit": { "context": 1000000, "output": 131072 }
+           }
+         }
+       }
+     }
+   }
+   ```
+
+3. Restart the proxy and Kilo, then select `midea/qwen3.5-omni` with `> /models`.
+
+#### How to find out which model your key supports
+
+- Check the API key issuance page or console where Midea gave you the `msk-` key; the allowed model is usually listed there.
+- If you are unsure, start with `volcengine-glm-5.3` and use the curl smoke test below. A 403 or a response like `"model not authorized"` means you need to change `MIDEA_FORCE_MODEL`.
+- The proxy logs every request; look for the line `[midea-proxy] model override: <kilo_model> -> <force_model>` to confirm the rewrite is happening.
+
+### 6. Switch model in Kilo
 
 Start or restart Kilo, then run:
 
@@ -211,9 +256,9 @@ Start or restart Kilo, then run:
 
 and select the Midea model that matches your key (e.g. `midea/volcengine-glm-5.3` or `midea/qwen3.5-omni`).
 
-### Using Midea in a Kilo session
+### 7. Using Midea in a Kilo session
 
-Once the proxy is running and Kilo is using `midea/volcengine-glm-5.3`, chat normally. The model name is shown in the status bar; all completions go through the local proxy to Midea AIMP.
+Once the proxy is running and Kilo is using the selected Midea model, chat normally. The model name is shown in the status bar; all completions go through the local proxy to Midea AIMP.
 
 To switch back to Ark at any time:
 
@@ -222,7 +267,7 @@ To switch back to Ark at any time:
 # select ark/ark-code-latest   (or any other Ark model)
 ```
 
-### Verify the proxy works (without Kilo)
+### 8. Verify the proxy works (without Kilo)
 
 Before starting Kilo, test the proxy with curl:
 
@@ -239,7 +284,7 @@ curl -s http://127.0.0.1:8000/v1/chat/completions \
 
 If you see a JSON response with assistant content, the proxy and your credentials are good. If you see a 403, check `MIDEA_AIGC_USER` and `MIDEA_MSK_API_KEY`.
 
-### Run the proxy in the background
+### 9. Run the proxy in the background
 
 The proxy must stay alive while Kilo runs. Quick options:
 
@@ -293,7 +338,7 @@ systemctl --user start midea-proxy.service
 systemctl --user status midea-proxy.service
 ```
 
-### Troubleshooting
+### 10. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -302,7 +347,7 @@ systemctl --user status midea-proxy.service
 | Kilo shows `model not found` | Not switched to the Midea provider | Run `> /models` and pick `midea/volcengine-glm-5.3`. |
 | Slow first response | Cold start / token generation | Normal; GLM 5.3 first-token latency can be a few seconds. |
 
-### Caveats
+### 11. Caveats
 
 - The proxy must be running before you start Kilo; if the proxy stops, Kilo will fail to get completions.
 - The upstream model depends on your `msk-` key. The default example is `volcengine-glm-5.3`; set `MIDEA_FORCE_MODEL` and the Kilo model name to whatever your key authorizes (e.g. `qwen3.5-omni`).
