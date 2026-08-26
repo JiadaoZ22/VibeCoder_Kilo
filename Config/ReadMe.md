@@ -151,11 +151,13 @@ export MIDEA_AIGC_USER="your_4a_account"
 # optional:
 export MIDEA_PROXY_PORT="8000"
 export MIDEA_AIMP_BIZ_ID="volcengine-glm-5.3"
+export MIDEA_FORCE_MODEL="volcengine-glm-5.3"
 ```
 
 - `MIDEA_MSK_API_KEY`: your Midea `msk-...` key.
 - `MIDEA_AIGC_USER`: **your real 4A account**; the upstream returns 403 without it.
-- `MIDEA_AIMP_BIZ_ID`: defaults to `volcengine-glm-5.3`.
+- `MIDEA_AIMP_BIZ_ID`: the business-id header required by the AIMP endpoint. Defaults to `volcengine-glm-5.3`; change it if your key is tied to a different model.
+- `MIDEA_FORCE_MODEL`: rewrites the `model` field in every request body. Defaults to `volcengine-glm-5.3`; set it to the model your key actually authorizes (e.g. `qwen3.5-omni`).
 
 ### 3. Start the proxy
 
@@ -197,6 +199,8 @@ The bundled `Config/opencode.json` already includes a `midea` provider block:
 
 `apiKey` can be `dummy` because authentication is handled by the proxy.
 
+> **Model name must match your key.** The snippet above uses `volcengine-glm-5.3` as the default example from Midea's documentation. If your `msk-` key only authorizes a different model (for example `qwen3.5-omni`), change both the `models` key in `opencode.json` and `MIDEA_FORCE_MODEL` to that value, then select `midea/qwen3.5-omni` in Kilo.
+
 ### 5. Switch model in Kilo
 
 Start or restart Kilo, then run:
@@ -205,7 +209,7 @@ Start or restart Kilo, then run:
 > /models
 ```
 
-and select `midea/volcengine-glm-5.3`.
+and select the Midea model that matches your key (e.g. `midea/volcengine-glm-5.3` or `midea/qwen3.5-omni`).
 
 ### Using Midea in a Kilo session
 
@@ -301,8 +305,8 @@ systemctl --user status midea-proxy.service
 ### Caveats
 
 - The proxy must be running before you start Kilo; if the proxy stops, Kilo will fail to get completions.
-- The upstream currently exposes only the `volcengine-glm-5.3` model through this path.
-- `midea-proxy.py` rewrites the `model` field in the request body to `volcengine-glm-5.3` by default. If Midea later supports more models through the same endpoint, set `MIDEA_FORCE_MODEL` accordingly.
+- The upstream model depends on your `msk-` key. The default example is `volcengine-glm-5.3`; set `MIDEA_FORCE_MODEL` and the Kilo model name to whatever your key authorizes (e.g. `qwen3.5-omni`).
+- `midea-proxy.py` rewrites the `model` field in the request body to `MIDEA_FORCE_MODEL` so Kilo and the upstream agree on the model name.
 - Keep your `msk-` key and 4A account off GitHub and out of `opencode.json`.
 
 ---

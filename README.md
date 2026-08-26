@@ -416,6 +416,8 @@ If you have a Midea internal `msk-` API key, you can route Kilo through a small 
 
 The bundled `Config/opencode.json` already contains the matching `midea` provider block pointing at `http://127.0.0.1:8000/v1` with a dummy API key. The real authentication happens inside the proxy.
 
+> **Model name depends on your key.** The default example is `volcengine-glm-5.3`. If your `msk-` key only authorizes a different model (for example `qwen3.5-omni`), set `MIDEA_FORCE_MODEL` and update the Kilo model name accordingly, then select `midea/qwen3.5-omni`.
+
 ### Usage in Kilo
 
 After the proxy is running and Kilo is restarted, switch the active model:
