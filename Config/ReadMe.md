@@ -360,14 +360,22 @@ systemctl --user status midea-proxy.service
 
 **Claude Code for VS Code cannot use this Midea AIMP setup directly.**
 
-Claude Code speaks the **Anthropic Messages API** (`/v1/messages`), while the Midea AIMP endpoint is **OpenAI-compatible** (`/v1/chat/completions`). Even if you set `ANTHROPIC_BASE_URL` to the local proxy in Claude Code's VS Code settings, the request shape and response shape do not match, so the upstream will reject the calls.
+Claude Code speaks the **Anthropic Messages API** (`/v1/messages`). Midea does expose a Claude model through endpoints such as:
 
-The only way to make Claude Code work with Midea would be to add an **Anthropic↔OpenAI protocol converter** in front of the proxy. That converter would:
-- translate Anthropic `/v1/messages` requests into OpenAI `/v1/chat/completions` requests,
-- map Anthropic model roles (Haiku/Sonnet/Opus) to the single Midea model your key authorizes,
-- convert SSE streams and tool-calling formats back to Anthropic shape.
+- `https://aimpapi.midea.com/t-aigc/mip-chat-app/claude/official/standard/sync/v3/chat/completions`
+- `https://aimpapi.midea.com/t-aigc/mip-chat-app/claude/official/standard/stream/v3/chat/completions`
 
-That is out of scope for this proxy and is generally fragile. We do **not** recommend it.
+However, those endpoints are **not** the Anthropic Messages API. They are an **AWS Bedrock Converse API wrapper** with a different request/response shape:
+
+| Field | Anthropic Messages API | Midea Claude/Bedrock endpoint |
+|---|---|---|
+| Model identifier | `model` (string) | `modelId` (string, e.g. `anthropic.claude-opus-5`) |
+| Message content | plain string or Anthropic content blocks | array of `{ "text": "..." }` blocks |
+| System prompt | `system` string | `system` array of `{ "text": "..." }` |
+| Tool format | Anthropic tools | `toolConfig.tools[].toolSpec` (Bedrock shape) |
+| Streaming | Server-Sent Events (`data: {...}`) | Custom binary/event framing |
+
+Because the schemas do not match, Claude Code still cannot talk to the Midea Claude endpoint directly. You would need a **three-way protocol converter** (Anthropic Messages ↔ Bedrock Converse) in addition to the local proxy. That is out of scope and fragile, so we do **not** recommend it.
 
 #### Recommended alternative: Kilo Code for VS Code
 

@@ -487,9 +487,9 @@ For systemd auto-start, curl smoke-test, and troubleshooting table, see [`Config
 
 **Claude Code for VS Code and Codex for VS Code cannot use this setup directly.**
 
-- Claude Code speaks the **Anthropic Messages API** (`/v1/messages`).
+- Claude Code speaks the **Anthropic Messages API** (`/v1/messages`). Midea's Claude endpoint (`.../claude/official/.../chat/completions`) is actually an **AWS Bedrock Converse API wrapper** (`modelId`, `toolConfig.tools[].toolSpec`, custom streaming), not the Anthropic Messages API.
 - Codex speaks the **OpenAI Responses API** (`/v1/responses`).
-- Midea AIMP only implements **OpenAI Chat Completions** (`/v1/chat/completions`).
+- The Midea OpenAI endpoint only implements **Chat Completions** (`/v1/chat/completions`).
 
 The request/response shapes do not match in either case, so the upstream will reject the calls.
 
