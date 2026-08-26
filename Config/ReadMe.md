@@ -384,6 +384,14 @@ Install the extension, then in its provider settings:
 
 Make sure the proxy is running (`~/.local/bin/start-midea-proxy.sh`) before you open a Kilo Code chat.
 
+#### Codex for VS Code
+
+**Codex for VS Code also cannot use this Midea AIMP setup directly.**
+
+Codex (CLI, desktop app, and VS Code extension) reads `~/.codex/config.toml` and, by default, speaks the **OpenAI Responses API** (`/v1/responses`). The Midea AIMP endpoint only implements **Chat Completions** (`/v1/chat/completions`). Even though both are "OpenAI-style", the request and response schemas are different, so Midea will reject Codex's calls.
+
+Some older Codex versions allowed `wire_api = "chat"`, but current versions require `wire_api = "responses"`. The only way to make current Codex work with Midea would be to add a **Responses↔ChatCompletions protocol converter** between Codex and the proxy. That is also out of scope and not recommended.
+
 #### Other VS Code extensions
 
 Any extension that supports an OpenAI-compatible provider (Cline, Roo Code, Continue, etc.) can use the same three values:

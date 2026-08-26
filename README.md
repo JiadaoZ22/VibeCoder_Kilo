@@ -485,9 +485,15 @@ For systemd auto-start, curl smoke-test, and troubleshooting table, see [`Config
 
 ### VS Code support
 
-**Claude Code for VS Code cannot use this setup directly** — it speaks the Anthropic Messages API, while Midea AIMP is OpenAI-compatible. The request/response shapes do not match.
+**Claude Code for VS Code and Codex for VS Code cannot use this setup directly.**
 
-If you want Midea inside VS Code, use an extension that supports OpenAI-compatible providers:
+- Claude Code speaks the **Anthropic Messages API** (`/v1/messages`).
+- Codex speaks the **OpenAI Responses API** (`/v1/responses`).
+- Midea AIMP only implements **OpenAI Chat Completions** (`/v1/chat/completions`).
+
+The request/response shapes do not match in either case, so the upstream will reject the calls.
+
+If you want Midea inside VS Code, use an extension that supports OpenAI-compatible Chat Completions providers:
 
 | Extension | Provider type | Base URL | API Key | Model |
 |---|---|---|---|---|
